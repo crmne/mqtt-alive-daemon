@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.example.mqttalive</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/path/to/your/mqtt-alive-daemon</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/tmp/mqtt-alive-daemon.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/mqtt-alive-daemon.error.log</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>MQTT_PASSWORD</key>
+        <string>your_mqtt_password</string>
+    </dict>
+</dict>
+</plist>
