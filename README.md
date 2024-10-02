@@ -67,7 +67,7 @@ With MQTT Alive Daemon, you can monitor various aspects of your computer(s) in H
    interval: 10
    commands:
      usb_audio:
-       command: "lsusb | grep 'Audio Device' > /dev/null && echo 'Connected' || echo 'Disconnected'"
+       command: "lsusb | grep 'Audio Device'"
        device_class: "plug"
      disk_space:
        command: "df -h / | awk 'NR==2 {print $5}' | sed 's/%//' | awk '$1 < 90 {exit 1}'"
