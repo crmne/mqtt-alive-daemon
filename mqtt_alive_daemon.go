@@ -21,7 +21,7 @@ import (
 
 // Version information
 var (
-	Version = "0.1.0"
+	Version = "0.1.1"
 	Commit  = "unknown"
 	Date    = "unknown"
 )
@@ -89,7 +89,9 @@ func main() {
 		SetClientID(deviceConfig.ClientID).
 		SetUsername(config.MQTTUsername).
 		SetPassword(config.MQTTPassword).
-		SetWill(fmt.Sprintf("%s/binary_sensor/%s/availability", discoveryPrefix, deviceConfig.ClientID), "offline", 1, true)
+		SetWill(fmt.Sprintf("%s/binary_sensor/%s/availability", discoveryPrefix, deviceConfig.ClientID), "offline", 1, true).
+		SetAutoReconnect(true).
+		SetOnConnectHandler(onConnect)
 
 	// Create MQTT client
 	client = mqtt.NewClient(opts)
@@ -100,12 +102,6 @@ func main() {
 	}
 
 	log.Println("Connected to MQTT broker:", config.MQTTBroker)
-
-	// Publish discovery messages
-	publishDiscovery()
-
-	// Publish initial availability
-	client.Publish(fmt.Sprintf("%s/binary_sensor/%s/availability", discoveryPrefix, deviceConfig.ClientID), 1, true, "online")
 
 	// Set up signal handling for graceful shutdown
 	signalChan := make(chan os.Signal, 1)
@@ -126,8 +122,15 @@ func main() {
 	}
 }
 
+func onConnect(client mqtt.Client) {
+	log.Println("Connected to MQTT broker")
+	publishDiscovery()
+	client.Publish(fmt.Sprintf("%s/binary_sensor/%s/availability", discoveryPrefix, deviceConfig.ClientID), 1, true, "online")
+}
+
 func runMainLoop() {
 	for {
+		checkMQTTConnection()
 		publishState("aliveness", "ON")
 		for name, command := range config.Commands {
 			state := "OFF"
@@ -137,6 +140,17 @@ func runMainLoop() {
 			publishState(name, state)
 		}
 		time.Sleep(time.Duration(config.Interval) * time.Second)
+	}
+}
+
+func checkMQTTConnection() {
+	if !client.IsConnected() {
+		log.Println("MQTT connection lost. Attempting to reconnect...")
+		if token := client.Connect(); token.Wait() && token.Error() != nil {
+			log.Printf("Failed to reconnect to MQTT broker: %v", token.Error())
+			return
+		}
+		log.Println("Reconnected to MQTT broker")
 	}
 }
 
