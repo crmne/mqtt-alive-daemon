@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.example.mqttalive</string>
+    <string>me.paolino.mqtt-alive-daemon</string>
     <key>ProgramArguments</key>
     <array>
         <string>/path/to/your/mqtt-alive-daemon</string>
