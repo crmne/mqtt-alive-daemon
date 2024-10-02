@@ -16,10 +16,5 @@
     <string>/tmp/mqtt-alive-daemon.log</string>
     <key>StandardErrorPath</key>
     <string>/tmp/mqtt-alive-daemon.error.log</string>
-    <key>EnvironmentVariables</key>
-    <dict>
-        <key>MQTT_PASSWORD</key>
-        <string>your_mqtt_password</string>
-    </dict>
 </dict>
 </plist>

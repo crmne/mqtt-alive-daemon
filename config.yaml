@@ -1,8 +1,0 @@
-mqtt_broker: "mqtt://homeassistant.local:1883"
-mqtt_topic: "homeassistant/binary_sensor/macbookair"
-mqtt_username: "awtrix"
-command: "ioreg -p IOUSB -l -w 0 | grep \"CalDigit Thunderbolt 3 Audio\""
-interval: 10
-client_id: "mqtt_alive_daemon"
-discovery_prefix: "homeassistant"
-device_name: "MacBook Air"

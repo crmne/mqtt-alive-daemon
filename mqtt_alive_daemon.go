@@ -1,29 +1,47 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
 	"os"
 	"os/exec"
 	"os/signal"
-	"strings"
+	"path/filepath"
+	"runtime"
 	"syscall"
 	"time"
 
+	"github.com/denisbrodbeck/machineid"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"gopkg.in/yaml.v2"
 )
 
+// Version information
+var (
+	Version = "0.1.0"
+	Commit  = "unknown"
+	Date    = "unknown"
+)
+
 type Config struct {
-	MQTTBroker      string `yaml:"mqtt_broker"`
-	MQTTTopic       string `yaml:"mqtt_topic"`
-	MQTTUsername    string `yaml:"mqtt_username"`
-	Command         string `yaml:"command"`
-	Interval        int    `yaml:"interval"`
-	ClientID        string `yaml:"client_id"`
-	DiscoveryPrefix string `yaml:"discovery_prefix"`
-	DeviceName      string `yaml:"device_name"`
+	MQTTBroker   string                   `yaml:"mqtt_broker"`
+	MQTTUsername string                   `yaml:"mqtt_username"`
+	MQTTPassword string                   `yaml:"mqtt_password"`
+	DeviceName   string                   `yaml:"device_name"`
+	Commands     map[string]CommandConfig `yaml:"commands"`
+	Interval     int                      `yaml:"interval"`
+}
+
+type CommandConfig struct {
+	Command     string `yaml:"command"`
+	DeviceClass string `yaml:"device_class"`
+}
+
+type DeviceConfig struct {
+	ClientID string `json:"client_id"`
 }
 
 type DiscoveryPayload struct {
@@ -42,30 +60,36 @@ type Device struct {
 	Name         string   `json:"name"`
 	Manufacturer string   `json:"manufacturer"`
 	Model        string   `json:"model"`
+	SwVersion    string   `json:"sw_version"`
 }
 
 var client mqtt.Client
 var config Config
+var deviceConfig DeviceConfig
+
+const (
+	discoveryPrefix  = "homeassistant"
+	configDir        = ".config/mqtt-alive-daemon"
+	configFile       = "config.yaml"
+	deviceConfigFile = "device_config.json"
+)
 
 func main() {
-	log.Println("Starting MQTT Alive Daemon")
+	log.Printf("Starting MQTT Alive Daemon v%s (%s) built on %s\n", Version, Commit, Date)
 
 	// Read configuration
 	config = readConfig()
 
-	// Get MQTT password from environment variable
-	mqttPassword := os.Getenv("MQTT_PASSWORD")
-	if mqttPassword == "" {
-		log.Fatal("MQTT_PASSWORD environment variable is not set")
-	}
+	// Get or generate client ID
+	deviceConfig = getOrCreateDeviceConfig()
 
 	// Create MQTT client options
 	opts := mqtt.NewClientOptions().
 		AddBroker(config.MQTTBroker).
-		SetClientID(config.ClientID).
+		SetClientID(deviceConfig.ClientID).
 		SetUsername(config.MQTTUsername).
-		SetPassword(mqttPassword).
-		SetWill(config.MQTTTopic+"/availability", "offline", 1, true)
+		SetPassword(config.MQTTPassword).
+		SetWill(fmt.Sprintf("%s/binary_sensor/%s/availability", discoveryPrefix, deviceConfig.ClientID), "offline", 1, true)
 
 	// Create MQTT client
 	client = mqtt.NewClient(opts)
@@ -77,19 +101,15 @@ func main() {
 
 	log.Println("Connected to MQTT broker:", config.MQTTBroker)
 
-	// Publish discovery message
-	publishDiscovery(client, config)
+	// Publish discovery messages
+	publishDiscovery()
 
 	// Publish initial availability
-	client.Publish(config.MQTTTopic+"/availability", 1, true, "online")
+	client.Publish(fmt.Sprintf("%s/binary_sensor/%s/availability", discoveryPrefix, deviceConfig.ClientID), 1, true, "online")
 
 	// Set up signal handling for graceful shutdown
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
-
-	// Start the power management listener
-	powerChan := make(chan string)
-	go listenForPowerEvents(powerChan)
 
 	// Start the main loop
 	go runMainLoop()
@@ -99,108 +119,37 @@ func main() {
 		select {
 		case sig := <-signalChan:
 			log.Printf("Received signal: %v\n", sig)
-			publishState("OFF")
+			publishState("aliveness", "OFF")
 			client.Disconnect(250)
 			os.Exit(0)
-		case event := <-powerChan:
-			handlePowerEvent(event)
 		}
 	}
 }
 
 func runMainLoop() {
 	for {
-		state := "ON"
-		if config.Command != "" {
-			if err := runCommand(config.Command); err == nil {
+		publishState("aliveness", "ON")
+		for name, command := range config.Commands {
+			state := "OFF"
+			if err := runCommand(command.Command); err == nil {
 				state = "ON"
-			} else {
-				state = "OFF"
 			}
+			publishState(name, state)
 		}
-
-		publishState(state)
 		time.Sleep(time.Duration(config.Interval) * time.Second)
 	}
 }
 
-func publishState(state string) {
-	token := client.Publish(config.MQTTTopic+"/state", 0, false, state)
+func publishState(name, state string) {
+	topic := fmt.Sprintf("%s/binary_sensor/%s_%s/state", discoveryPrefix, deviceConfig.ClientID, name)
+	token := client.Publish(topic, 0, false, state)
 	token.Wait()
-	log.Printf("Published state: %s to topic: %s/state\n", state, config.MQTTTopic)
-}
-
-func handlePowerEvent(event string) {
-	switch event {
-	case "sleep":
-		log.Println("System is going to sleep")
-		publishState("OFF")
-	case "wake":
-		log.Println("System is waking up")
-		publishState("ON")
-	}
-}
-
-func listenForPowerEvents(powerChan chan<- string) {
-	script := `
-		#!/bin/bash
-		on_sleep() {
-			echo "sleep"
-			exit 0
-		}
-		on_wake() {
-			echo "wake"
-			exit 0
-		}
-		trap on_sleep SIGTERM
-		trap on_wake SIGCONT
-		while true; do
-			sleep 2 &
-			wait $!
-		done
-	`
-
-	cmd := exec.Command("bash", "-c", script)
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		log.Fatalf("Failed to create stdout pipe: %v", err)
-	}
-
-	if err := cmd.Start(); err != nil {
-		log.Fatalf("Failed to start sleep/wake script: %v", err)
-	}
-
-	go func() {
-		for {
-			buf := make([]byte, 1024)
-			n, err := stdout.Read(buf)
-			if err != nil {
-				log.Printf("Error reading script output: %v", err)
-				return
-			}
-			output := strings.TrimSpace(string(buf[:n]))
-			if output != "" {
-				powerChan <- output
-			}
-		}
-	}()
-
-	// Start caffeinate to prevent sleep
-	caffeinateCmd := exec.Command("caffeinate", "-d")
-	if err := caffeinateCmd.Start(); err != nil {
-		log.Fatalf("Failed to start caffeinate: %v", err)
-	}
-
-	go func() {
-		err := caffeinateCmd.Wait()
-		if err != nil {
-			log.Printf("caffeinate exited: %v", err)
-		}
-	}()
+	log.Printf("Published state: %s to topic: %s\n", state, topic)
 }
 
 func readConfig() Config {
-	data, err := os.ReadFile("config.yaml")
+	configPath := filepath.Join(os.Getenv("HOME"), configDir, configFile)
+	data, err := os.ReadFile(configPath)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -219,20 +168,32 @@ func runCommand(command string) error {
 	return cmd.Run()
 }
 
-func publishDiscovery(client mqtt.Client, config Config) {
+func publishDiscovery() {
+	publishSensorDiscovery("aliveness", "Aliveness", "connectivity")
+	for name, cmdConfig := range config.Commands {
+		deviceClass := cmdConfig.DeviceClass
+		if deviceClass == "" {
+			deviceClass = "problem" // Default to "problem" if not specified
+		}
+		publishSensorDiscovery(name, name, deviceClass)
+	}
+}
+
+func publishSensorDiscovery(name, displayName, deviceClass string) {
 	payload := DiscoveryPayload{
-		Name:              config.DeviceName,
-		UniqueID:          config.ClientID,
-		StateTopic:        config.MQTTTopic + "/state",
+		Name:              displayName,
+		UniqueID:          fmt.Sprintf("%s_%s", deviceConfig.ClientID, name),
+		StateTopic:        fmt.Sprintf("%s/binary_sensor/%s_%s/state", discoveryPrefix, deviceConfig.ClientID, name),
 		PayloadOn:         "ON",
 		PayloadOff:        "OFF",
-		DeviceClass:       "connectivity",
-		AvailabilityTopic: config.MQTTTopic + "/availability",
+		DeviceClass:       deviceClass,
+		AvailabilityTopic: fmt.Sprintf("%s/binary_sensor/%s/availability", discoveryPrefix, deviceConfig.ClientID),
 		Device: Device{
-			Identifiers:  []string{config.ClientID},
+			Identifiers:  []string{deviceConfig.ClientID},
 			Name:         config.DeviceName,
 			Manufacturer: "MQTT Alive Daemon",
-			Model:        "v1.0",
+			Model:        fmt.Sprintf("v%s (%s/%s)", Version, runtime.GOOS, runtime.GOARCH),
+			SwVersion:    fmt.Sprintf("%s (%s)", Version, Commit),
 		},
 	}
 
@@ -242,10 +203,49 @@ func publishDiscovery(client mqtt.Client, config Config) {
 		return
 	}
 
-	discoveryTopic := fmt.Sprintf("%s/binary_sensor/%s/config", config.DiscoveryPrefix, config.ClientID)
+	discoveryTopic := fmt.Sprintf("%s/binary_sensor/%s_%s/config", discoveryPrefix, deviceConfig.ClientID, name)
 	token := client.Publish(discoveryTopic, 0, true, payloadJSON)
 	token.Wait()
 
-	log.Printf("Published discovery message to topic: %s\n", discoveryTopic)
-	log.Printf("Discovery payload: %s\n", string(payloadJSON))
+	log.Printf("Published discovery message for %s to topic: %s\n", name, discoveryTopic)
+}
+
+func getOrCreateDeviceConfig() DeviceConfig {
+	configPath := filepath.Join(os.Getenv("HOME"), configDir, deviceConfigFile)
+	var deviceConfig DeviceConfig
+
+	// Try to read existing config
+	data, err := os.ReadFile(configPath)
+	if err == nil {
+		err = json.Unmarshal(data, &deviceConfig)
+		if err == nil && deviceConfig.ClientID != "" {
+			return deviceConfig
+		}
+	}
+
+	// Generate new client ID
+	id, err := machineid.ProtectedID("mqtt-alive-daemon")
+	if err != nil {
+		log.Fatal("Failed to generate machine ID:", err)
+	}
+	hash := sha256.Sum256([]byte(id))
+	deviceConfig.ClientID = hex.EncodeToString(hash[:])[:32]
+
+	// Save the config
+	data, err = json.Marshal(deviceConfig)
+	if err != nil {
+		log.Fatal("Failed to marshal device config:", err)
+	}
+
+	err = os.MkdirAll(filepath.Dir(configPath), 0700)
+	if err != nil {
+		log.Fatal("Failed to create config directory:", err)
+	}
+
+	err = os.WriteFile(configPath, data, 0600)
+	if err != nil {
+		log.Fatal("Failed to write device config:", err)
+	}
+
+	return deviceConfig
 }

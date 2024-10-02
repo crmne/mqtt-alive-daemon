@@ -6,7 +6,6 @@ After=network.target
 ExecStart=/path/to/your/mqtt-alive-daemon
 Restart=always
 User=yourusername
-Environment="MQTT_PASSWORD=your_mqtt_password"
 
 [Install]
 WantedBy=multi-user.target
