@@ -19,12 +19,7 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-// Version information
-var (
-	Version = "0.2.0"
-	Commit  = "unknown"
-	Date    = "unknown"
-)
+var Version = "0.2.0"
 
 type Config struct {
 	MQTTBroker   string                   `yaml:"mqtt_broker"`
@@ -88,7 +83,7 @@ func getConfigLocations() []string {
 
 func readConfig() Config {
 	configLocations := getConfigLocations()
-	
+
 	var config Config
 	var err error
 	var data []byte
@@ -160,7 +155,7 @@ func saveDeviceConfig(deviceConfig DeviceConfig, dir string) error {
 }
 
 func Run() error {
-	log.Printf("Starting MQTT Alive Daemon v%s (%s) built on %s\n", Version, Commit, Date)
+	log.Printf("Starting MQTT Alive Daemon v%s\n", Version)
 
 	// Read configuration
 	config = readConfig()
@@ -200,9 +195,9 @@ func Run() error {
 		select {
 		case sig := <-signalChan:
 			log.Printf("Received signal: %v\n", sig)
-	    client.Publish(fmt.Sprintf("%s/binary_sensor/%s/availability", discoveryPrefix, deviceConfig.ClientID), 1, true, "offline")
+			client.Publish(fmt.Sprintf("%s/binary_sensor/%s/availability", discoveryPrefix, deviceConfig.ClientID), 1, true, "offline")
 			client.Disconnect(250)
-      return nil
+			return nil
 		}
 	}
 }
@@ -276,7 +271,7 @@ func publishSensorDiscovery(name, displayName, deviceClass string) {
 			Name:         config.DeviceName,
 			Manufacturer: "MQTT Alive Daemon",
 			Model:        fmt.Sprintf("v%s (%s/%s)", Version, runtime.GOOS, runtime.GOARCH),
-			SwVersion:    fmt.Sprintf("%s (%s)", Version, Commit),
+			SwVersion:    fmt.Sprintf("%s", Version),
 		},
 	}
 
@@ -292,4 +287,3 @@ func publishSensorDiscovery(name, displayName, deviceClass string) {
 
 	log.Printf("Published discovery message for %s to topic: %s\n", name, discoveryTopic)
 }
-

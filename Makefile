@@ -1,12 +1,7 @@
-# Version
-VERSION=$(shell git describe --tags --always --dirty)
-COMMIT=$(shell git rev-parse HEAD)
-DATE=$(shell date -u +%Y-%m-%d)
-
 # Go parameters
 GOCMD=go
-GOBUILD=$(GOCMD) build -ldflags "-X main.Version=$(VERSION) -X main.Commit=$(COMMIT) -X main.Date=$(DATE)"
-GOINSTALL=$(GOCMD) install -ldflags "-X main.Version=$(VERSION) -X main.Commit=$(COMMIT) -X main.Date=$(DATE)"
+GOBUILD=$(GOCMD) build
+GOINSTALL=$(GOCMD) install
 GOCLEAN=$(GOCMD) clean
 GOTEST=$(GOCMD) test
 GOGET=$(GOCMD) get
@@ -43,19 +38,20 @@ install: build
 	sudo cp $(BINARY_NAME) $(INSTALL_DIR)/
 	sudo mkdir -p $(CONFIG_DIR)
 	sudo chmod 755 $(CONFIG_DIR)
-	sudo cp -n config.yaml.example $(CONFIG_DIR)/config.yaml
+	sudo cp -n config.yaml.example $(CONFIG_DIR)/config.yaml || true
 	@echo "Example configuration file copied to $(CONFIG_DIR)/config.yaml"
 	@echo "Please edit $(CONFIG_DIR)/config.yaml with your MQTT broker details and desired settings."
 	sudo mkdir -p $(SERVICE_DIR)
 ifeq ($(DETECTED_OS),Darwin)
 	sudo sed 's|/path/to/your/mqtt-alive-daemon|$(INSTALL_DIR)/$(BINARY_NAME)|g' $(SERVICE_FILE) | sudo tee $(SERVICE_DIR)/$(SERVICE_FILE) > /dev/null
+	sudo launchctl unload $(SERVICE_DIR)/$(SERVICE_FILE)
 	sudo launchctl load $(SERVICE_DIR)/$(SERVICE_FILE)
 	@echo "LaunchDaemon installed and loaded."
 else ifeq ($(DETECTED_OS),Linux)
 	sudo sed 's|/path/to/your/mqtt-alive-daemon|$(INSTALL_DIR)/$(BINARY_NAME)|g' $(SERVICE_FILE) | sudo tee $(SERVICE_DIR)/$(SERVICE_FILE) > /dev/null
 	sudo systemctl daemon-reload
 	sudo systemctl enable mqtt-alive-daemon
-	sudo systemctl start mqtt-alive-daemon
+	sudo systemctl restart mqtt-alive-daemon
 	@echo "Systemd service installed and started."
 endif
 	@echo "Installation complete!"
