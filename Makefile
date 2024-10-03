@@ -40,7 +40,7 @@ install: build
 	sudo chmod 755 $(CONFIG_DIR)
 	sudo cp -n config.yaml.example $(CONFIG_DIR)/config.yaml || true
 	@echo "Example configuration file copied to $(CONFIG_DIR)/config.yaml"
-	@echo "Please edit $(CONFIG_DIR)/config.yaml with your MQTT broker details and desired settings."
+	@echo "!!! Please edit $(CONFIG_DIR)/config.yaml with your MQTT broker details and desired settings."
 	sudo mkdir -p $(SERVICE_DIR)
 ifeq ($(DETECTED_OS),Darwin)
 	sudo sed 's|/path/to/your/mqtt-alive-daemon|$(INSTALL_DIR)/$(BINARY_NAME)|g' $(SERVICE_FILE) | sudo tee $(SERVICE_DIR)/$(SERVICE_FILE) > /dev/null
