@@ -1,4 +1,4 @@
-package main
+package mqttalive
 
 import (
 	"crypto/sha256"
@@ -21,7 +21,7 @@ import (
 
 // Version information
 var (
-	Version = "0.1.1"
+	Version = "0.2.0"
 	Commit  = "unknown"
 	Date    = "unknown"
 )
@@ -68,13 +68,98 @@ var config Config
 var deviceConfig DeviceConfig
 
 const (
-	discoveryPrefix  = "homeassistant"
-	configDir        = ".config/mqtt-alive-daemon"
-	configFile       = "config.yaml"
-	deviceConfigFile = "device_config.json"
+	discoveryPrefix = "homeassistant"
 )
 
-func main() {
+var (
+	systemConfigDirs = []string{
+		"/etc/mqtt-alive-daemon",
+		"/usr/local/etc/mqtt-alive-daemon",
+	}
+	userConfigDirs = []string{
+		filepath.Join(os.Getenv("HOME"), ".config/mqtt-alive-daemon"),
+		filepath.Join(os.Getenv("HOME"), "Library/Application Support/mqtt-alive-daemon"),
+	}
+)
+
+func getConfigLocations() []string {
+	return append(systemConfigDirs, userConfigDirs...)
+}
+
+func readConfig() Config {
+	configLocations := getConfigLocations()
+	
+	var config Config
+	var err error
+	var data []byte
+
+	for _, location := range configLocations {
+		data, err = os.ReadFile(filepath.Join(location, "config.yaml"))
+		if err == nil {
+			break
+		}
+	}
+
+	if err != nil {
+		log.Fatal("Could not find a valid configuration file")
+	}
+
+	err = yaml.Unmarshal(data, &config)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return config
+}
+
+func getOrCreateDeviceConfig() DeviceConfig {
+	configLocations := getConfigLocations()
+	var deviceConfig DeviceConfig
+
+	for _, dir := range configLocations {
+		configPath := filepath.Join(dir, "device_config.json")
+		data, err := os.ReadFile(configPath)
+		if err == nil {
+			err = json.Unmarshal(data, &deviceConfig)
+			if err == nil && deviceConfig.ClientID != "" {
+				return deviceConfig
+			}
+		}
+	}
+
+	// If not found, generate new client ID
+	id, err := machineid.ProtectedID("mqtt-alive-daemon")
+	if err != nil {
+		log.Fatal("Failed to generate machine ID:", err)
+	}
+	hash := sha256.Sum256([]byte(id))
+	deviceConfig.ClientID = hex.EncodeToString(hash[:])[:32]
+
+	for _, dir := range configLocations {
+		if err := saveDeviceConfig(deviceConfig, dir); err == nil {
+			return deviceConfig
+		}
+	}
+	log.Fatal("Failed to save device config in any location")
+	return DeviceConfig{} // This line will never be reached, but it's needed for compilation
+}
+
+func saveDeviceConfig(deviceConfig DeviceConfig, dir string) error {
+	err := os.MkdirAll(dir, 0755)
+	if err != nil {
+		return err
+	}
+
+	configPath := filepath.Join(dir, "device_config.json")
+	data, err := json.Marshal(deviceConfig)
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(configPath, data, 0644)
+}
+
+func Run() error {
 	log.Printf("Starting MQTT Alive Daemon v%s (%s) built on %s\n", Version, Commit, Date)
 
 	// Read configuration
@@ -115,9 +200,9 @@ func main() {
 		select {
 		case sig := <-signalChan:
 			log.Printf("Received signal: %v\n", sig)
-			publishState("aliveness", "OFF")
+	    client.Publish(fmt.Sprintf("%s/binary_sensor/%s/availability", discoveryPrefix, deviceConfig.ClientID), 1, true, "offline")
 			client.Disconnect(250)
-			os.Exit(0)
+      return nil
 		}
 	}
 }
@@ -159,22 +244,6 @@ func publishState(name, state string) {
 	token := client.Publish(topic, 0, false, state)
 	token.Wait()
 	log.Printf("Published state: %s to topic: %s\n", state, topic)
-}
-
-func readConfig() Config {
-	configPath := filepath.Join(os.Getenv("HOME"), configDir, configFile)
-	data, err := os.ReadFile(configPath)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	var config Config
-	err = yaml.Unmarshal(data, &config)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	return config
 }
 
 func runCommand(command string) error {
@@ -224,42 +293,3 @@ func publishSensorDiscovery(name, displayName, deviceClass string) {
 	log.Printf("Published discovery message for %s to topic: %s\n", name, discoveryTopic)
 }
 
-func getOrCreateDeviceConfig() DeviceConfig {
-	configPath := filepath.Join(os.Getenv("HOME"), configDir, deviceConfigFile)
-	var deviceConfig DeviceConfig
-
-	// Try to read existing config
-	data, err := os.ReadFile(configPath)
-	if err == nil {
-		err = json.Unmarshal(data, &deviceConfig)
-		if err == nil && deviceConfig.ClientID != "" {
-			return deviceConfig
-		}
-	}
-
-	// Generate new client ID
-	id, err := machineid.ProtectedID("mqtt-alive-daemon")
-	if err != nil {
-		log.Fatal("Failed to generate machine ID:", err)
-	}
-	hash := sha256.Sum256([]byte(id))
-	deviceConfig.ClientID = hex.EncodeToString(hash[:])[:32]
-
-	// Save the config
-	data, err = json.Marshal(deviceConfig)
-	if err != nil {
-		log.Fatal("Failed to marshal device config:", err)
-	}
-
-	err = os.MkdirAll(filepath.Dir(configPath), 0700)
-	if err != nil {
-		log.Fatal("Failed to create config directory:", err)
-	}
-
-	err = os.WriteFile(configPath, data, 0600)
-	if err != nil {
-		log.Fatal("Failed to write device config:", err)
-	}
-
-	return deviceConfig
-}

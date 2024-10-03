@@ -1,0 +1,12 @@
+mqtt_broker: "mqtt://your-mqtt-broker:1883"
+mqtt_username: "your_username"
+mqtt_password: "your_password"
+device_name: "My Computer"
+interval: 10
+commands:
+  usb_audio:
+    command: "lsusb | grep 'Audio Device'"
+    device_class: "plug"
+  disk_space:
+    command: "df -h / | awk 'NR==2 {print $5}' | sed 's/%//' | awk '$1 < 90 {exit 1}'"
+    device_class: "problem"

@@ -13,8 +13,10 @@
     <key>KeepAlive</key>
     <true/>
     <key>StandardOutPath</key>
-    <string>/tmp/mqtt-alive-daemon.log</string>
+    <string>/var/log/mqtt-alive-daemon.log</string>
     <key>StandardErrorPath</key>
-    <string>/tmp/mqtt-alive-daemon.error.log</string>
+    <string>/var/log/mqtt-alive-daemon.error.log</string>
+    <key>UserName</key>
+    <string>root</string>
 </dict>
 </plist>
