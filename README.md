@@ -12,6 +12,29 @@ MQTT Alive Daemon reports the status of your computer and custom commands to Hom
 - **Multi-Machine Deployment**: Automatically generates a unique client ID for each machine, allowing easy deployment across multiple computers.
 - **Flexible Configuration**: Simple YAML configuration file for easy setup and modification.
 
+## Use Cases
+
+With MQTT Alive Daemon, you can monitor various aspects of your computer(s) in Home Assistant, such as:
+
+1. **USB Device Connection**: Check if specific USB devices are connected.
+   Example command: `lsusb | grep "Device Name"` (Linux)
+   Example command: `ioreg -p IOUSB -l -w 0 | grep "CalDigit Thunderbolt 3 Audio"` (macOS)
+
+2. **Disk Space**: Monitor available disk space.
+   Example command: `df -h / | awk 'NR==2 {print $5}' | sed 's/%//' | awk '$1 < 90 {exit 1}'`
+
+3. **Process Running**: Check if a particular process is running.
+   Example command: `pgrep -x "process_name" > /dev/null && echo "Running" || echo "Not running"`
+
+4. **Network Connectivity**: Test connection to a specific host.
+   Example command: `ping -c 1 example.com > /dev/null && echo "Reachable" || echo "Unreachable"`
+
+5. **Temperature Monitoring**: Report CPU temperature (on supported systems).
+   Example command: `sensors | grep "CPU Temperature" | awk '{print $3}' | cut -c2-3`
+
+6. **Battery Status**: Check laptop battery level (on supported systems).
+   Example command: `pmset -g batt | grep -Eo "\d+%" | cut -d% -f1`
+
 ## Installation
 
 ### Prerequisites
@@ -27,7 +50,6 @@ MQTT Alive Daemon reports the status of your computer and custom commands to Hom
    git clone https://github.com/crmne/mqtt-alive-daemon.git
    cd mqtt-alive-daemon
    ```
-
 2. Build and install the application:
    ```
    make install
