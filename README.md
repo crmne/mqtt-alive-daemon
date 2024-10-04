@@ -18,7 +18,7 @@ With MQTT Alive Daemon, you can monitor various aspects of your computer(s) in H
 
 1. **USB Device Connection**: Check if specific USB devices are connected.  
    Example command: `lsusb | grep "Device Name"` (Linux)  
-   Example command: `ioreg -p IOUSB -l -w 0 | grep "CalDigit Thunderbolt 3 Audio"` (macOS)
+   Example command: `ioreg -p IOUSB -l -w 0 | grep "Device Name"` (macOS)
 
 2. **Disk Space**: Monitor available disk space.  
    Example command: `df -h / | awk 'NR==2 {print $5}' | sed 's/%//' | awk '$1 < 90 {exit 1}'`
