@@ -1,3 +1,5 @@
+<a href="https://www.buymeacoffee.com/crmne" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" ></a>
+
 # MQTT Alive Daemon
 
 MQTT Alive Daemon reports the status of your computer and custom commands to Home Assistant via MQTT. It's designed to be lightweight, easy to configure, and deployable across multiple machines.
