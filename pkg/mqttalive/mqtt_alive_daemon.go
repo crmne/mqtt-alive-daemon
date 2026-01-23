@@ -11,7 +11,6 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
-	"syscall"
 	"time"
 
 	"github.com/denisbrodbeck/machineid"
@@ -19,7 +18,7 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-var Version = "0.2.0"
+var Version = "0.3.0"
 
 type Config struct {
 	MQTTBroker   string                   `yaml:"mqtt_broker"`
@@ -66,19 +65,39 @@ const (
 	discoveryPrefix = "homeassistant"
 )
 
-var (
-	systemConfigDirs = []string{
-		"/etc/mqtt-alive-daemon",
-		"/usr/local/etc/mqtt-alive-daemon",
-	}
-	userConfigDirs = []string{
-		filepath.Join(os.Getenv("HOME"), ".config/mqtt-alive-daemon"),
-		filepath.Join(os.Getenv("HOME"), "Library/Application Support/mqtt-alive-daemon"),
-	}
-)
-
 func getConfigLocations() []string {
-	return append(systemConfigDirs, userConfigDirs...)
+	locations := []string{}
+	switch runtime.GOOS {
+	case "windows":
+		if programData := os.Getenv("PROGRAMDATA"); programData != "" {
+			locations = append(locations, filepath.Join(programData, "mqtt-alive-daemon"))
+		}
+		if userConfigDir, err := os.UserConfigDir(); err == nil && userConfigDir != "" {
+			locations = appendUniqueLocation(locations, filepath.Join(userConfigDir, "mqtt-alive-daemon"))
+		}
+	case "darwin":
+		locations = append(locations, "/etc/mqtt-alive-daemon", "/usr/local/etc/mqtt-alive-daemon")
+		if homeDir, err := os.UserHomeDir(); err == nil && homeDir != "" {
+			locations = appendUniqueLocation(locations, filepath.Join(homeDir, ".config", "mqtt-alive-daemon"))
+			locations = appendUniqueLocation(locations, filepath.Join(homeDir, "Library", "Application Support", "mqtt-alive-daemon"))
+		}
+	default:
+		locations = append(locations, "/etc/mqtt-alive-daemon", "/usr/local/etc/mqtt-alive-daemon")
+		if homeDir, err := os.UserHomeDir(); err == nil && homeDir != "" {
+			locations = appendUniqueLocation(locations, filepath.Join(homeDir, ".config", "mqtt-alive-daemon"))
+		}
+	}
+
+	return locations
+}
+
+func appendUniqueLocation(locations []string, location string) []string {
+	for _, existing := range locations {
+		if filepath.Clean(existing) == filepath.Clean(location) {
+			return locations
+		}
+	}
+	return append(locations, location)
 }
 
 func readConfig() Config {
@@ -185,7 +204,7 @@ func Run() error {
 
 	// Set up signal handling for graceful shutdown
 	signalChan := make(chan os.Signal, 1)
-	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(signalChan, getSignals()...)
 
 	// Start the main loop
 	go runMainLoop()
@@ -242,7 +261,12 @@ func publishState(name, state string) {
 }
 
 func runCommand(command string) error {
-	cmd := exec.Command("bash", "-c", command)
+	var cmd *exec.Cmd
+	if runtime.GOOS == "windows" {
+		cmd = exec.Command("powershell", "-NoProfile", "-NonInteractive", "-Command", command)
+	} else {
+		cmd = exec.Command("bash", "-c", command)
+	}
 	return cmd.Run()
 }
 

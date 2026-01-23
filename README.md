@@ -41,7 +41,8 @@ With MQTT Alive Daemon, you can monitor various aspects of your computer(s) in H
 
 - Go 1.16 or later
 - Git
-- Root access (sudo)
+- Root access (sudo) on macOS/Linux
+  - On Windows, administrator access is only required if you want to write to `%ProgramData%`.
 
 ### Installation Steps
 
@@ -64,6 +65,33 @@ With MQTT Alive Daemon, you can monitor various aspects of your computer(s) in H
 3. Edit the configuration file:
    - On macOS: `/usr/local/etc/mqtt-alive-daemon/config.yaml`
    - On Linux: `/etc/mqtt-alive-daemon/config.yaml`
+   - On Windows: `%ProgramData%\mqtt-alive-daemon\config.yaml` or `%APPDATA%\mqtt-alive-daemon\config.yaml`
+
+### Windows (PowerShell)
+
+1. Build the application:
+   ```
+   powershell -ExecutionPolicy Bypass -File .\scripts\build.ps1
+   ```
+2. Install (defaults to per-user in `%APPDATA%`):
+   ```
+   powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1
+   ```
+   To install for all users (requires admin):
+   ```
+   powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1 -InstallScope AllUsers
+   ```
+   This also registers a Windows Scheduled Task named `mqtt-alive-daemon`:
+   - `AllUsers`: runs at system startup as `SYSTEM`
+   - `CurrentUser`: runs at user logon
+   If Scheduled Tasks are blocked, it falls back to a Startup folder entry.
+3. Edit the configuration file:
+   - `%APPDATA%\mqtt-alive-daemon\config.yaml`
+   - Or `%ProgramData%\mqtt-alive-daemon\config.yaml` if you install with `-InstallScope AllUsers`
+4. Run the daemon:
+   ```
+   powershell -ExecutionPolicy Bypass -File .\scripts\run.ps1
+   ```
 
 ### Uninstallation
 
@@ -73,14 +101,21 @@ To uninstall the application and remove all associated files:
 sudo make uninstall
 ```
 
+On Windows:
+
+```
+powershell -ExecutionPolicy Bypass -File .\scripts\uninstall.ps1
+```
 ## Configuration
 
 The daemon looks for the configuration and device files in the following locations (in order):
 
 1. `/etc/mqtt-alive-daemon/`
 2. `/usr/local/etc/mqtt-alive-daemon/`
-3. `~/.config/mqtt-alive-daemon/`
-4. `~/Library/Application Support/mqtt-alive-daemon/` (macOS only)
+3. `%ProgramData%\mqtt-alive-daemon\` (Windows only)
+4. `~/.config/mqtt-alive-daemon/`
+5. `~/Library/Application Support/mqtt-alive-daemon/` (macOS only)
+6. `%APPDATA%\mqtt-alive-daemon\` (Windows only)
 
 The main configuration file is named `config.yaml`, and the device-specific configuration is stored in `device_config.json`.
 
@@ -99,6 +134,20 @@ commands:
   disk_space:
     command: "df -h / | awk 'NR==2 {print $5}' | sed 's/%//' | awk '$1 < 90 {exit 1}'"
     device_class: "problem"
+```
+
+On Windows, commands are executed via PowerShell, so adjust the command syntax accordingly.
+
+Windows examples:
+
+```yaml
+commands:
+  mg_xu:
+    command: "Get-PnpDevice -PresentOnly | Where-Object { $_.FriendlyName -like '*MG-XU*' -and $_.Status -eq 'OK' } | Select-Object -First 1 | ForEach-Object { 'OK' }"
+    device_class: "plug"
+  usb_2_5g_lan:
+    command: "Get-NetAdapter | Where-Object { $_.InterfaceDescription -like '*Realtek*USB*2.5GbE*' -and $_.Status -eq 'Up' } | Select-Object -First 1 | ForEach-Object { 'OK' }"
+    device_class: "plug"
 ```
 
 The `device_config.json` file is automatically generated and managed by the application. It stores a unique client ID for each machine, allowing for multi-machine deployment.
@@ -127,6 +176,12 @@ To build the application without installing:
 
 ```
 make build
+```
+
+On Windows:
+
+```
+powershell -ExecutionPolicy Bypass -File .\scripts\build.ps1
 ```
 
 To run tests:
