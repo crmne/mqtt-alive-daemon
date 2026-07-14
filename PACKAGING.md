@@ -18,6 +18,11 @@ goreleaser:
 - `checksums.txt`
 - GitHub's automatic source archive for the tag
 
+The linux binaries are built with cgo so `.local` (mDNS) broker names resolve
+through glibc NSS; they require glibc 2.35+ (Ubuntu 22.04, Debian 12, Fedora 36
+or newer). The darwin and windows binaries are pure Go and resolve hostnames
+through their OS APIs.
+
 The archives contain:
 
 - `mqtt-alive-daemon` (or `mqtt-alive-daemon.exe`)
@@ -40,11 +45,13 @@ Build time:
 
 ## Build From Source
 
-Packagers should stamp the version through `pkg/mqttalive`:
+Packagers should stamp the version through `pkg/mqttalive` and build with cgo
+enabled, so hostname resolution goes through glibc NSS — the release binaries
+are `CGO_ENABLED=0` and cannot resolve mDNS (`.local`) broker names:
 
 ```sh
-version=0.4.0
-CGO_ENABLED=0 go build -trimpath \
+version=0.4.1
+CGO_ENABLED=1 go build -trimpath \
   -ldflags "-s -w -X github.com/crmne/mqtt-alive-daemon/pkg/mqttalive.Version=${version}" \
   -o mqtt-alive-daemon .
 ```

@@ -12,13 +12,28 @@ before:
     - go mod tidy
 
 builds:
-  - id: mqtt-alive-daemon
+  # cgo so hostname lookups go through glibc NSS (mDNS .local broker names)
+  - id: linux
+    main: .
+    binary: mqtt-alive-daemon
+    env:
+      - CGO_ENABLED=1
+      - 'CC={{ if eq .Arch "arm64" }}aarch64-linux-gnu-gcc{{ else }}gcc{{ end }}'
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X github.com/crmne/mqtt-alive-daemon/pkg/mqttalive.Version={{ .Version }}
+
+  # darwin and windows resolve hostnames through OS APIs without cgo
+  - id: portable
     main: .
     binary: mqtt-alive-daemon
     env:
       - CGO_ENABLED=0
     goos:
-      - linux
       - darwin
       - windows
     goarch:
@@ -29,6 +44,9 @@ builds:
 
 archives:
   - id: bundle
+    ids:
+      - linux
+      - portable
     formats: [tar.gz]
     format_overrides:
       - goos: windows
