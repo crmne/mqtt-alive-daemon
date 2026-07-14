@@ -1,125 +1,67 @@
-<a href="https://www.buymeacoffee.com/crmne" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" ></a>
+<div align="center">
 
 # MQTT Alive Daemon
 
-MQTT Alive Daemon reports the status of your computer and custom commands to Home Assistant via MQTT. It's designed to be lightweight, easy to configure, and deployable across multiple machines.
+**Turn any computer into a Home Assistant device.**
 
-## Features
+[![GitHub Release](https://img.shields.io/github/v/release/crmne/mqtt-alive-daemon)](https://github.com/crmne/mqtt-alive-daemon/releases)
+[![AUR](https://img.shields.io/aur/version/mqtt-alive-daemon)](https://aur.archlinux.org/packages/mqtt-alive-daemon)
+[![Go Report Card](https://goreportcard.com/badge/github.com/crmne/mqtt-alive-daemon)](https://goreportcard.com/report/github.com/crmne/mqtt-alive-daemon)
+[![CI](https://github.com/crmne/mqtt-alive-daemon/actions/workflows/ci.yml/badge.svg)](https://github.com/crmne/mqtt-alive-daemon/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-- **Aliveness Reporting**: Regularly reports if the computer is online and running the daemon.
-- **Custom Command Monitoring**: Execute and report the status of user-defined commands.
-- **Home Assistant Integration**: Uses MQTT discovery for seamless integration with Home Assistant.
-- **Multi-Machine Deployment**: Automatically generates a unique client ID for each machine, allowing easy deployment across multiple computers.
-- **Flexible Configuration**: Simple YAML configuration file for easy setup and modification.
+</div>
 
-## Use Cases
+---
 
-With MQTT Alive Daemon, you can monitor various aspects of your computer(s) in Home Assistant, such as:
+mqtt-alive-daemon is a small daemon that reports whether your machines are alive — plus anything a shell command can check — as binary sensors in Home Assistant, over MQTT with automatic discovery. Install it on every computer you own and each one shows up as its own device.
 
-1. **USB Device Connection**: Check if specific USB devices are connected.  
-   Example command: `lsusb | grep "Device Name"` (Linux)  
-   Example command: `ioreg -p IOUSB -l -w 0 | grep "Device Name"` (macOS)
+## What you get
 
-2. **Disk Space**: Monitor available disk space.  
-   Example command: `df -h / | awk 'NR==2 {print $5}' | sed 's/%//' | awk '$1 < 90 {exit 1}'`
+- **Aliveness sensor** -- each machine reports online/offline, with an MQTT last will so crashes and shutdowns show up too
+- **Command sensors** -- any shell command becomes a binary sensor; exit 0 turns it ON
+- **Automatic discovery** -- sensors appear in Home Assistant by themselves, no YAML on the HA side
+- **One device per machine** -- a stable client ID derived from the machine ID, so the same config deploys everywhere
+- **Cross-platform** -- Linux, macOS, and Windows; commands run through bash or PowerShell
+- **One binary and a YAML file** -- no runtime dependencies beyond a shell
 
-3. **Process Running**: Check if a particular process is running.  
-   Example command: `pgrep -x "process_name" > /dev/null && echo "Running" || echo "Not running"`
+## Install
 
-4. **Network Connectivity**: Test connection to a specific host.  
-   Example command: `ping -c 1 example.com > /dev/null && echo "Reachable" || echo "Unreachable"`
+Arch Linux:
 
-5. **Temperature Monitoring**: Report CPU temperature (on supported systems).  
-   Example command: `sensors | grep "CPU Temperature" | awk '{print $3}' | cut -c2-3`
-
-6. **Battery Status**: Check laptop battery level (on supported systems).  
-   Example command: `pmset -g batt | grep -Eo "\d+%" | cut -d% -f1`
-
-## Installation
-
-### Prerequisites
-
-- Go 1.16 or later
-- Git
-- Root access (sudo) on macOS/Linux
-  - On Windows, administrator access is only required if you want to write to `%ProgramData%`.
-
-### Installation Steps
-
-1. Clone the repository:
-   ```
-   git clone https://github.com/crmne/mqtt-alive-daemon.git
-   cd mqtt-alive-daemon
-   ```
-2. Build and install the application:
-   ```
-   make install
-   ```
-
-   This command will:
-   - Build the application
-   - Install the binary to `/usr/local/bin`
-   - Copy an example configuration file to the appropriate location
-   - Set up and start the system service (launchd on macOS, systemd on Linux)
-
-3. Edit the configuration file:
-   - On macOS: `/usr/local/etc/mqtt-alive-daemon/config.yaml`
-   - On Linux: `/etc/mqtt-alive-daemon/config.yaml`
-   - On Windows: `%ProgramData%\mqtt-alive-daemon\config.yaml` or `%APPDATA%\mqtt-alive-daemon\config.yaml`
-
-### Windows (PowerShell)
-
-1. Build the application:
-   ```
-   powershell -ExecutionPolicy Bypass -File .\scripts\build.ps1
-   ```
-2. Install (defaults to per-user in `%APPDATA%`):
-   ```
-   powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1
-   ```
-   To install for all users (requires admin):
-   ```
-   powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1 -InstallScope AllUsers
-   ```
-   This also registers a Windows Scheduled Task named `mqtt-alive-daemon`:
-   - `AllUsers`: runs at system startup as `SYSTEM`
-   - `CurrentUser`: runs at user logon
-   If Scheduled Tasks are blocked, it falls back to a Startup folder entry.
-3. Edit the configuration file:
-   - `%APPDATA%\mqtt-alive-daemon\config.yaml`
-   - Or `%ProgramData%\mqtt-alive-daemon\config.yaml` if you install with `-InstallScope AllUsers`
-4. Run the daemon:
-   ```
-   powershell -ExecutionPolicy Bypass -File .\scripts\run.ps1
-   ```
-
-### Uninstallation
-
-To uninstall the application and remove all associated files:
-
-```
-sudo make uninstall
+```bash
+yay -S mqtt-alive-daemon
+# or
+yay -S mqtt-alive-daemon-git
 ```
 
-On Windows:
+Prebuilt binaries for Linux, macOS, and Windows are on the [releases page](https://github.com/crmne/mqtt-alive-daemon/releases). The Linux binaries need glibc 2.35+ (Ubuntu 22.04, Debian 12, Fedora 36 or newer).
 
+macOS and Linux, from source:
+
+```bash
+git clone https://github.com/crmne/mqtt-alive-daemon.git
+cd mqtt-alive-daemon
+make install
 ```
-powershell -ExecutionPolicy Bypass -File .\scripts\uninstall.ps1
+
+This builds the binary, installs it to `/usr/local/bin`, copies an example config into place, and sets up the system service (launchd on macOS, systemd on Linux).
+
+Windows, from source (defaults to per-user in `%APPDATA%`):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1
+# or for all users (requires admin):
+powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1 -InstallScope AllUsers
 ```
-## Configuration
 
-The daemon looks for the configuration and device files in the following locations (in order):
+This registers a Scheduled Task that runs at logon (`CurrentUser`) or system startup (`AllUsers`), falling back to a Startup folder entry if Scheduled Tasks are blocked.
 
-1. `/etc/mqtt-alive-daemon/`
-2. `/usr/local/etc/mqtt-alive-daemon/`
-3. `%ProgramData%\mqtt-alive-daemon\` (Windows only)
-4. `~/.config/mqtt-alive-daemon/`
-5. `~/Library/Application Support/mqtt-alive-daemon/` (macOS only)
-6. `%APPDATA%\mqtt-alive-daemon\` (Windows only)
+Distro packagers should use [PACKAGING.md](PACKAGING.md).
 
-The main configuration file is named `config.yaml`, and the device-specific configuration is stored in `device_config.json`.
+## Configure
 
-Edit the `config.yaml` file:
+Edit `config.yaml`:
 
 ```yaml
 mqtt_broker: "mqtt://your-mqtt-broker:1883"
@@ -136,74 +78,96 @@ commands:
     device_class: "problem"
 ```
 
-On Windows, commands are executed via PowerShell, so adjust the command syntax accordingly.
+Every `interval` seconds the daemon runs each command; exit 0 turns the sensor ON. `device_class` is any [Home Assistant binary sensor class](https://www.home-assistant.io/integrations/binary_sensor/#device-class) and defaults to `problem`.
 
-Windows examples:
+The daemon looks for `config.yaml` in these locations, in order:
+
+1. `/etc/mqtt-alive-daemon/`
+2. `/usr/local/etc/mqtt-alive-daemon/`
+3. `%ProgramData%\mqtt-alive-daemon\` (Windows only)
+4. `~/.config/mqtt-alive-daemon/`
+5. `~/Library/Application Support/mqtt-alive-daemon/` (macOS only)
+6. `%APPDATA%\mqtt-alive-daemon\` (Windows only)
+
+On Windows, commands run through PowerShell:
 
 ```yaml
 commands:
   mg_xu:
     command: "Get-PnpDevice -PresentOnly | Where-Object { $_.FriendlyName -like '*MG-XU*' -and $_.Status -eq 'OK' } | Select-Object -First 1 | ForEach-Object { 'OK' }"
     device_class: "plug"
-  usb_2_5g_lan:
-    command: "Get-NetAdapter | Where-Object { $_.InterfaceDescription -like '*Realtek*USB*2.5GbE*' -and $_.Status -eq 'Up' } | Select-Object -First 1 | ForEach-Object { 'OK' }"
-    device_class: "plug"
 ```
 
-The `device_config.json` file is automatically generated and managed by the application. It stores a unique client ID for each machine, allowing for multi-machine deployment.
+A `device_config.json` appears next to the config on first run. It stores the machine's client ID — leave it alone, it's what keeps the Home Assistant device identity stable across upgrades.
 
-## Usage
+## Enable the service
 
-After installation and configuration, the daemon will start automatically on system boot. You can manually start, stop, or check the status of the service:
+Package and `make install` setups start on boot already. To manage the service:
 
-- On macOS:
-  ```
-  sudo launchctl load /Library/LaunchDaemons/me.paolino.mqtt-alive-daemon.plist
-  sudo launchctl unload /Library/LaunchDaemons/me.paolino.mqtt-alive-daemon.plist
-  sudo launchctl list | grep mqtt-alive-daemon
-  ```
+Linux:
 
-- On Linux:
-  ```
-  sudo systemctl start mqtt-alive-daemon
-  sudo systemctl stop mqtt-alive-daemon
-  sudo systemctl status mqtt-alive-daemon
-  ```
-
-## Development
-
-To build the application without installing:
-
+```bash
+sudo systemctl enable --now mqtt-alive-daemon
+sudo systemctl status mqtt-alive-daemon
 ```
-make build
+
+macOS:
+
+```bash
+sudo launchctl load /Library/LaunchDaemons/me.paolino.mqtt-alive-daemon.plist
+sudo launchctl list | grep mqtt-alive-daemon
+```
+
+The sensors appear in Home Assistant under **Settings → Devices & Services → MQTT** as soon as the daemon connects.
+
+## Use cases
+
+- **USB devices** -- is the audio interface actually plugged in?
+  `lsusb | grep 'Audio Device'` (Linux), `ioreg -p IOUSB -l -w 0 | grep 'Device Name'` (macOS)
+- **Disk space** -- alert before a disk fills up
+  `df -h / | awk 'NR==2 {print $5}' | sed 's/%//' | awk '$1 < 90 {exit 1}'`
+- **Processes** -- is the backup agent running?
+  `pgrep -x borg`
+- **Network** -- can this machine reach a host?
+  `ping -c 1 example.com`
+- **Anything else** -- if a shell one-liner can check it, it can be a sensor in Home Assistant
+
+## Why it exists
+
+Home Assistant can tell you about your lights, but not whether the studio Mac still sees its audio interface, whether the office PC's disk is filling up, or whether a machine is even switched on. Anything you can check from a shell should be a sensor — without writing an integration, and without YAML on the Home Assistant side.
+
+## How it works
+
+On connect, the daemon publishes retained [MQTT discovery](https://www.home-assistant.io/integrations/mqtt/#mqtt-discovery) configs, so Home Assistant creates the device and its sensors automatically. Every `interval` seconds it publishes the aliveness sensor and one state per command. An MQTT last will marks the device offline the moment the connection drops, and the client ID — derived from the machine ID and persisted in `device_config.json` — keeps each machine's identity stable across reinstalls and upgrades.
+
+## Uninstall
+
+```bash
+sudo make uninstall   # keeps /etc/mqtt-alive-daemon (credentials and device identity)
+sudo make purge       # removes it too
 ```
 
 On Windows:
 
-```
-powershell -ExecutionPolicy Bypass -File .\scripts\build.ps1
-```
-
-To run tests:
-
-```
-make test
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\uninstall.ps1                # keeps config
+powershell -ExecutionPolicy Bypass -File .\scripts\uninstall.ps1 -RemoveConfig # removes it too
 ```
 
-To clean up build artifacts:
+## Development
 
+```bash
+make build   # build without installing
+make test    # run tests
+make clean   # remove build artifacts
 ```
-make clean
-```
 
-## Home Assistant Integration
+On Windows, `scripts\build.ps1` and `scripts\run.ps1` do the same.
 
-The daemon will automatically create binary sensors in Home Assistant for the aliveness check and each configured command. You can use these sensors in automations, scripts, or display them on your dashboard.
+## Support
 
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
+If this saves you a trip to the server closet, you can [buy me a coffee](https://www.buymeacoffee.com/crmne).
 
 ## License
 
-This project is licensed under the MIT License.
+MIT
