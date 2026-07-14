@@ -6,7 +6,6 @@
 
 [![GitHub Release](https://img.shields.io/github/v/release/crmne/mqtt-alive-daemon)](https://github.com/crmne/mqtt-alive-daemon/releases)
 [![AUR](https://img.shields.io/aur/version/mqtt-alive-daemon)](https://aur.archlinux.org/packages/mqtt-alive-daemon)
-[![Go Report Card](https://goreportcard.com/badge/github.com/crmne/mqtt-alive-daemon)](https://goreportcard.com/report/github.com/crmne/mqtt-alive-daemon)
 [![CI](https://github.com/crmne/mqtt-alive-daemon/actions/workflows/ci.yml/badge.svg)](https://github.com/crmne/mqtt-alive-daemon/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
@@ -33,6 +32,13 @@ Arch Linux:
 yay -S mqtt-alive-daemon
 # or
 yay -S mqtt-alive-daemon-git
+```
+
+macOS and Linux, via Homebrew:
+
+```bash
+brew install crmne/tap/mqtt-alive-daemon
+brew services start mqtt-alive-daemon
 ```
 
 Prebuilt binaries for Linux, macOS, and Windows are on the [releases page](https://github.com/crmne/mqtt-alive-daemon/releases). The Linux binaries need glibc 2.35+ (Ubuntu 22.04, Debian 12, Fedora 36 or newer).
