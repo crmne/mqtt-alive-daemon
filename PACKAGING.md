@@ -46,8 +46,8 @@ Build time:
 ## Build From Source
 
 Packagers should stamp the version through `pkg/mqttalive` and build with cgo
-enabled, so hostname resolution goes through glibc NSS — the release binaries
-are `CGO_ENABLED=0` and cannot resolve mDNS (`.local`) broker names:
+enabled, so hostname resolution goes through glibc NSS and mDNS (`.local`)
+broker names resolve:
 
 ```sh
 version=0.4.1
@@ -72,7 +72,7 @@ For systemd-based distros, also install:
 ```
 
 Do not enable or start the service from package scripts, and do not install a
-live `config.yaml` — it holds MQTT credentials. Users opt in with:
+live `config.yaml`, which holds MQTT credentials. Users opt in with:
 
 ```sh
 install -m 600 /etc/mqtt-alive-daemon/config.yaml.example /etc/mqtt-alive-daemon/config.yaml
@@ -85,9 +85,9 @@ systemctl enable --now mqtt-alive-daemon
 The AUR packages are maintained in separate git repos, checked out locally under
 `.tmp/` (gitignored):
 
-- `.tmp/aur-mqtt-alive-daemon` — stable, installs release binaries
+- `.tmp/aur-mqtt-alive-daemon`: stable, builds from the release tag
   (`ssh://aur@aur.archlinux.org/mqtt-alive-daemon.git`)
-- `.tmp/aur-mqtt-alive-daemon-git` — builds from the latest git commit
+- `.tmp/aur-mqtt-alive-daemon-git`: builds from the latest git commit
   (`ssh://aur@aur.archlinux.org/mqtt-alive-daemon-git.git`)
 
 Release flow for the stable package:
