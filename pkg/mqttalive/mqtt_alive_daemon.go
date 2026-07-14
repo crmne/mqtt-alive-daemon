@@ -1,8 +1,6 @@
 package mqttalive
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -18,7 +16,7 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-var Version = "0.3.0"
+var Version = "0.4.0"
 
 type Config struct {
 	MQTTBroker   string                   `yaml:"mqtt_broker"`
@@ -63,6 +61,7 @@ var deviceConfig DeviceConfig
 
 const (
 	discoveryPrefix = "homeassistant"
+	defaultInterval = 10
 )
 
 func getConfigLocations() []string {
@@ -100,7 +99,7 @@ func appendUniqueLocation(locations []string, location string) []string {
 	return append(locations, location)
 }
 
-func readConfig() Config {
+func readConfig() (Config, error) {
 	configLocations := getConfigLocations()
 
 	var config Config
@@ -115,18 +114,21 @@ func readConfig() Config {
 	}
 
 	if err != nil {
-		log.Fatal("Could not find a valid configuration file")
+		return Config{}, fmt.Errorf("could not find a valid configuration file")
 	}
 
-	err = yaml.Unmarshal(data, &config)
-	if err != nil {
-		log.Fatal(err)
+	if err := yaml.Unmarshal(data, &config); err != nil {
+		return Config{}, err
 	}
 
-	return config
+	if config.Interval <= 0 {
+		config.Interval = defaultInterval
+	}
+
+	return config, nil
 }
 
-func getOrCreateDeviceConfig() DeviceConfig {
+func getOrCreateDeviceConfig() (DeviceConfig, error) {
 	configLocations := getConfigLocations()
 	var deviceConfig DeviceConfig
 
@@ -136,7 +138,7 @@ func getOrCreateDeviceConfig() DeviceConfig {
 		if err == nil {
 			err = json.Unmarshal(data, &deviceConfig)
 			if err == nil && deviceConfig.ClientID != "" {
-				return deviceConfig
+				return deviceConfig, nil
 			}
 		}
 	}
@@ -144,18 +146,16 @@ func getOrCreateDeviceConfig() DeviceConfig {
 	// If not found, generate new client ID
 	id, err := machineid.ProtectedID("mqtt-alive-daemon")
 	if err != nil {
-		log.Fatal("Failed to generate machine ID:", err)
+		return DeviceConfig{}, fmt.Errorf("failed to generate machine ID: %w", err)
 	}
-	hash := sha256.Sum256([]byte(id))
-	deviceConfig.ClientID = hex.EncodeToString(hash[:])[:32]
+	deviceConfig.ClientID = id[:32]
 
 	for _, dir := range configLocations {
 		if err := saveDeviceConfig(deviceConfig, dir); err == nil {
-			return deviceConfig
+			return deviceConfig, nil
 		}
 	}
-	log.Fatal("Failed to save device config in any location")
-	return DeviceConfig{} // This line will never be reached, but it's needed for compilation
+	return DeviceConfig{}, fmt.Errorf("failed to save device config in any location")
 }
 
 func saveDeviceConfig(deviceConfig DeviceConfig, dir string) error {
@@ -176,11 +176,16 @@ func saveDeviceConfig(deviceConfig DeviceConfig, dir string) error {
 func Run() error {
 	log.Printf("Starting MQTT Alive Daemon v%s\n", Version)
 
-	// Read configuration
-	config = readConfig()
+	var err error
+	config, err = readConfig()
+	if err != nil {
+		return err
+	}
 
-	// Get or generate client ID
-	deviceConfig = getOrCreateDeviceConfig()
+	deviceConfig, err = getOrCreateDeviceConfig()
+	if err != nil {
+		return err
+	}
 
 	// Create MQTT client options
 	opts := mqtt.NewClientOptions().
@@ -188,8 +193,9 @@ func Run() error {
 		SetClientID(deviceConfig.ClientID).
 		SetUsername(config.MQTTUsername).
 		SetPassword(config.MQTTPassword).
-		SetWill(fmt.Sprintf("%s/binary_sensor/%s/availability", discoveryPrefix, deviceConfig.ClientID), "offline", 1, true).
+		SetWill(availabilityTopic(), "offline", 1, true).
 		SetAutoReconnect(true).
+		SetConnectRetry(true).
 		SetOnConnectHandler(onConnect)
 
 	// Create MQTT client
@@ -197,7 +203,7 @@ func Run() error {
 
 	// Connect to the MQTT broker
 	if token := client.Connect(); token.Wait() && token.Error() != nil {
-		log.Fatal(token.Error())
+		return token.Error()
 	}
 
 	log.Println("Connected to MQTT broker:", config.MQTTBroker)
@@ -209,27 +215,22 @@ func Run() error {
 	// Start the main loop
 	go runMainLoop()
 
-	// Wait for signals
-	for {
-		select {
-		case sig := <-signalChan:
-			log.Printf("Received signal: %v\n", sig)
-			client.Publish(fmt.Sprintf("%s/binary_sensor/%s/availability", discoveryPrefix, deviceConfig.ClientID), 1, true, "offline")
-			client.Disconnect(250)
-			return nil
-		}
-	}
+	// Wait for a signal
+	sig := <-signalChan
+	log.Printf("Received signal: %v\n", sig)
+	client.Publish(availabilityTopic(), 1, true, "offline").Wait()
+	client.Disconnect(250)
+	return nil
 }
 
 func onConnect(client mqtt.Client) {
 	log.Println("Connected to MQTT broker")
 	publishDiscovery()
-	client.Publish(fmt.Sprintf("%s/binary_sensor/%s/availability", discoveryPrefix, deviceConfig.ClientID), 1, true, "online")
+	client.Publish(availabilityTopic(), 1, true, "online")
 }
 
 func runMainLoop() {
 	for {
-		checkMQTTConnection()
 		publishState("aliveness", "ON")
 		for name, command := range config.Commands {
 			state := "OFF"
@@ -242,21 +243,22 @@ func runMainLoop() {
 	}
 }
 
-func checkMQTTConnection() {
-	if !client.IsConnected() {
-		log.Println("MQTT connection lost. Attempting to reconnect...")
-		if token := client.Connect(); token.Wait() && token.Error() != nil {
-			log.Printf("Failed to reconnect to MQTT broker: %v", token.Error())
-			return
-		}
-		log.Println("Reconnected to MQTT broker")
-	}
+func availabilityTopic() string {
+	return fmt.Sprintf("%s/binary_sensor/%s/availability", discoveryPrefix, deviceConfig.ClientID)
+}
+
+func stateTopic(name string) string {
+	return fmt.Sprintf("%s/binary_sensor/%s_%s/state", discoveryPrefix, deviceConfig.ClientID, name)
 }
 
 func publishState(name, state string) {
-	topic := fmt.Sprintf("%s/binary_sensor/%s_%s/state", discoveryPrefix, deviceConfig.ClientID, name)
+	topic := stateTopic(name)
 	token := client.Publish(topic, 0, false, state)
 	token.Wait()
+	if err := token.Error(); err != nil {
+		log.Printf("Failed to publish state to topic %s: %v", topic, err)
+		return
+	}
 	log.Printf("Published state: %s to topic: %s\n", state, topic)
 }
 
@@ -285,17 +287,17 @@ func publishSensorDiscovery(name, displayName, deviceClass string) {
 	payload := DiscoveryPayload{
 		Name:              displayName,
 		UniqueID:          fmt.Sprintf("%s_%s", deviceConfig.ClientID, name),
-		StateTopic:        fmt.Sprintf("%s/binary_sensor/%s_%s/state", discoveryPrefix, deviceConfig.ClientID, name),
+		StateTopic:        stateTopic(name),
 		PayloadOn:         "ON",
 		PayloadOff:        "OFF",
 		DeviceClass:       deviceClass,
-		AvailabilityTopic: fmt.Sprintf("%s/binary_sensor/%s/availability", discoveryPrefix, deviceConfig.ClientID),
+		AvailabilityTopic: availabilityTopic(),
 		Device: Device{
 			Identifiers:  []string{deviceConfig.ClientID},
 			Name:         config.DeviceName,
 			Manufacturer: "MQTT Alive Daemon",
 			Model:        fmt.Sprintf("v%s (%s/%s)", Version, runtime.GOOS, runtime.GOARCH),
-			SwVersion:    fmt.Sprintf("%s", Version),
+			SwVersion:    Version,
 		},
 	}
 
@@ -308,6 +310,10 @@ func publishSensorDiscovery(name, displayName, deviceClass string) {
 	discoveryTopic := fmt.Sprintf("%s/binary_sensor/%s_%s/config", discoveryPrefix, deviceConfig.ClientID, name)
 	token := client.Publish(discoveryTopic, 0, true, payloadJSON)
 	token.Wait()
+	if err := token.Error(); err != nil {
+		log.Printf("Failed to publish discovery message for %s: %v", name, err)
+		return
+	}
 
 	log.Printf("Published discovery message for %s to topic: %s\n", name, discoveryTopic)
 }

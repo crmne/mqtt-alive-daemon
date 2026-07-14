@@ -39,7 +39,7 @@ if (Test-Path $exePath) {
 if (-not $KeepConfig -and (Test-Path $ConfigDir)) {
 	Remove-Item -Recurse -Force $ConfigDir
 	Write-Host "Removed $ConfigDir"
-} else if ($KeepConfig) {
+} elseif ($KeepConfig) {
 	Write-Host "Kept config directory $ConfigDir"
 }
 
