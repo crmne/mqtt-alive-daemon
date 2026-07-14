@@ -59,6 +59,38 @@ archives:
       - packaging/systemd/mqtt-alive-daemon.service
       - packaging/launchd/me.paolino.mqtt-alive-daemon.plist
 
+brews:
+  - name: mqtt-alive-daemon
+    ids:
+      - bundle
+    repository:
+      owner: crmne
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    directory: Formula
+    homepage: https://github.com/crmne/mqtt-alive-daemon
+    description: Reports machine aliveness and custom command checks to Home Assistant via MQTT
+    license: MIT
+    commit_author:
+      name: Carmine Paolino
+      email: carmine@paolino.me
+    install: |
+      bin.install "mqtt-alive-daemon"
+      (etc/"mqtt-alive-daemon").install "config.yaml.example"
+    service: |
+      run [opt_bin/"mqtt-alive-daemon"]
+      keep_alive true
+      log_path var/"log/mqtt-alive-daemon.log"
+      error_log_path var/"log/mqtt-alive-daemon.error.log"
+    caveats: |
+      Create your config before starting the service:
+        mkdir -p ~/.config/mqtt-alive-daemon
+        install -m 600 $(brew --prefix)/etc/mqtt-alive-daemon/config.yaml.example ~/.config/mqtt-alive-daemon/config.yaml
+      then edit it with your MQTT broker details and run:
+        brew services start mqtt-alive-daemon
+    test: |
+      assert_predicate bin/"mqtt-alive-daemon", :exist?
+
 checksum:
   name_template: checksums.txt
 
