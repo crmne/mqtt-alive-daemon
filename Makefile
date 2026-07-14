@@ -20,11 +20,13 @@ ifeq ($(DETECTED_OS),Darwin)
     CONFIG_DIR=/usr/local/etc/mqtt-alive-daemon
     SERVICE_DIR=/Library/LaunchDaemons
     SERVICE_FILE=me.paolino.mqtt-alive-daemon.plist
+    SERVICE_SRC=packaging/launchd/$(SERVICE_FILE)
 else ifeq ($(DETECTED_OS),Linux)
     INSTALL_DIR=/usr/local/bin
     CONFIG_DIR=/etc/mqtt-alive-daemon
     SERVICE_DIR=/etc/systemd/system
     SERVICE_FILE=mqtt-alive-daemon.service
+    SERVICE_SRC=packaging/systemd/$(SERVICE_FILE)
 endif
 
 all: build
@@ -39,16 +41,17 @@ install: build
 	sudo mkdir -p $(CONFIG_DIR)
 	sudo chmod 755 $(CONFIG_DIR)
 	sudo cp -n config.yaml.example $(CONFIG_DIR)/config.yaml || true
+	sudo chmod 600 $(CONFIG_DIR)/config.yaml
 	@echo "Example configuration file copied to $(CONFIG_DIR)/config.yaml"
 	@echo "!!! Please edit $(CONFIG_DIR)/config.yaml with your MQTT broker details and desired settings."
 	sudo mkdir -p $(SERVICE_DIR)
 ifeq ($(DETECTED_OS),Darwin)
-	sudo sed 's|/path/to/your/mqtt-alive-daemon|$(INSTALL_DIR)/$(BINARY_NAME)|g' $(SERVICE_FILE) | sudo tee $(SERVICE_DIR)/$(SERVICE_FILE) > /dev/null
+	sudo sed 's|/usr/bin/$(BINARY_NAME)|$(INSTALL_DIR)/$(BINARY_NAME)|g' $(SERVICE_SRC) | sudo tee $(SERVICE_DIR)/$(SERVICE_FILE) > /dev/null
 	sudo launchctl unload $(SERVICE_DIR)/$(SERVICE_FILE)
 	sudo launchctl load $(SERVICE_DIR)/$(SERVICE_FILE)
 	@echo "LaunchDaemon installed and loaded."
 else ifeq ($(DETECTED_OS),Linux)
-	sudo sed 's|/path/to/your/mqtt-alive-daemon|$(INSTALL_DIR)/$(BINARY_NAME)|g' $(SERVICE_FILE) | sudo tee $(SERVICE_DIR)/$(SERVICE_FILE) > /dev/null
+	sudo sed 's|/usr/bin/$(BINARY_NAME)|$(INSTALL_DIR)/$(BINARY_NAME)|g' $(SERVICE_SRC) | sudo tee $(SERVICE_DIR)/$(SERVICE_FILE) > /dev/null
 	sudo systemctl daemon-reload
 	sudo systemctl enable mqtt-alive-daemon
 	sudo systemctl restart mqtt-alive-daemon
@@ -82,6 +85,6 @@ run: build
 	sudo ./$(BINARY_NAME)
 
 deps:
-	$(GOGET) -v -d ./...
+	$(GOCMD) mod download
 
 .PHONY: all build install uninstall clean test run deps

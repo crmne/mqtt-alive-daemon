@@ -6,7 +6,7 @@
     <string>me.paolino.mqtt-alive-daemon</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/path/to/your/mqtt-alive-daemon</string>
+        <string>/usr/bin/mqtt-alive-daemon</string>
     </array>
     <key>RunAtLoad</key>
     <true/>

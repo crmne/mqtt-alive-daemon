@@ -1,11 +1,11 @@
 [Unit]
 Description=MQTT Alive Daemon
-After=network.target
+After=network-online.target
+Wants=network-online.target
 
 [Service]
-ExecStart=/path/to/your/mqtt-alive-daemon
+ExecStart=/usr/bin/mqtt-alive-daemon
 Restart=always
-User=root
 
 [Install]
 WantedBy=multi-user.target

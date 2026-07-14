@@ -1,0 +1,56 @@
+version: 2
+
+project_name: mqtt-alive-daemon
+
+release:
+  github:
+    owner: crmne
+    name: mqtt-alive-daemon
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: mqtt-alive-daemon
+    main: .
+    binary: mqtt-alive-daemon
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X github.com/crmne/mqtt-alive-daemon/pkg/mqttalive.Version={{ .Version }}
+
+archives:
+  - id: bundle
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - README.md
+      - LICENSE
+      - config.yaml.example
+      - packaging/systemd/mqtt-alive-daemon.service
+      - packaging/launchd/me.paolino.mqtt-alive-daemon.plist
+
+checksum:
+  name_template: checksums.txt
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^chore:'
