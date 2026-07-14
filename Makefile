@@ -70,9 +70,13 @@ else ifeq ($(DETECTED_OS),Linux)
 	sudo rm $(SERVICE_DIR)/$(SERVICE_FILE)
 	sudo systemctl daemon-reload
 endif
-	sudo rm -rf $(CONFIG_DIR)
 	sudo rm $(INSTALL_DIR)/$(BINARY_NAME)
 	@echo "Uninstallation complete!"
+	@echo "Configuration kept at $(CONFIG_DIR) (holds your MQTT credentials and device identity). Run 'make purge' to remove it."
+
+purge: uninstall
+	sudo rm -rf $(CONFIG_DIR)
+	@echo "Removed $(CONFIG_DIR)"
 
 clean:
 	$(GOCLEAN)
@@ -87,4 +91,4 @@ run: build
 deps:
 	$(GOCMD) mod download
 
-.PHONY: all build install uninstall clean test run deps
+.PHONY: all build install uninstall purge clean test run deps

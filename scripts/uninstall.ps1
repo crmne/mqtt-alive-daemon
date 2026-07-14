@@ -3,7 +3,7 @@ param(
 	[string]$InstallScope = "CurrentUser",
 	[string]$InstallDir,
 	[string]$ConfigDir,
-	[switch]$KeepConfig,
+	[switch]$RemoveConfig,
 	[switch]$UnregisterTask = $true,
 	[string]$TaskName = "mqtt-alive-daemon"
 )
@@ -36,11 +36,11 @@ if (Test-Path $exePath) {
 	Write-Host "Binary not found at $exePath"
 }
 
-if (-not $KeepConfig -and (Test-Path $ConfigDir)) {
+if ($RemoveConfig -and (Test-Path $ConfigDir)) {
 	Remove-Item -Recurse -Force $ConfigDir
 	Write-Host "Removed $ConfigDir"
-} elseif ($KeepConfig) {
-	Write-Host "Kept config directory $ConfigDir"
+} else {
+	Write-Host "Kept config directory $ConfigDir (holds your MQTT credentials and device identity). Pass -RemoveConfig to delete it."
 }
 
 if ($UnregisterTask) {
