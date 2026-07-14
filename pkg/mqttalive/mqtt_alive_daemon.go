@@ -16,7 +16,7 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-var Version = "0.4.0"
+var Version = "0.4.1"
 
 type Config struct {
 	MQTTBroker   string                   `yaml:"mqtt_broker"`
@@ -175,6 +175,12 @@ func saveDeviceConfig(deviceConfig DeviceConfig, dir string) error {
 
 func Run() error {
 	log.Printf("Starting MQTT Alive Daemon v%s\n", Version)
+
+	// Paho's connect-retry loop swallows errors (DNS failures, refused
+	// connections) unless its internal loggers are wired up.
+	mqtt.CRITICAL = log.New(os.Stderr, "MQTT CRITICAL: ", log.LstdFlags)
+	mqtt.ERROR = log.New(os.Stderr, "MQTT ERROR: ", log.LstdFlags)
+	mqtt.WARN = log.New(os.Stderr, "MQTT WARN: ", log.LstdFlags)
 
 	var err error
 	config, err = readConfig()
