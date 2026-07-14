@@ -110,7 +110,7 @@ Current status as of 2026-07-14:
 
 | Channel | Status | Notes |
 |---|---|---|
-| Arch AUR | Prepared | Both repos are committed locally under `.tmp/` and ready to push. The stable package needs a `v0.4.0` release published first (for `updpkgsums`). |
+| Arch AUR | Published | Stable [`mqtt-alive-daemon`](https://aur.archlinux.org/packages/mqtt-alive-daemon) (source build) and VCS [`mqtt-alive-daemon-git`](https://aur.archlinux.org/packages/mqtt-alive-daemon-git), both built with cgo. |
 
 ## Smoke Tests
 
