@@ -6,6 +6,11 @@ gem 'native-packages', '0.5.0'
 require 'native_packages/build'
 
 artifacts = JSON.parse(File.read('dist/artifacts.json')).select { |a| a['type'] == 'Binary' && a['goos'] == 'darwin' }
+probe_directory = Dir.mktmpdir('mqtt-clang-diagnostic-')
+probe = File.join(probe_directory, 'clang-cli')
+out, status = Open3.capture2e('clang', '-x', 'c', '-o', probe, '-', stdin_data: 'int main(void) { return 0; }')
+raise "Clang probe failed: #{out}" unless status.success?
+artifacts << { 'path' => probe, 'goarch' => 'fresh-clang-host' }
 results = []
 signer = NativePackages::MacosSigning.new(Pathname.pwd)
 signer.with_identity do
@@ -14,10 +19,12 @@ signer.with_identity do
   fingerprint = identities[/\b[0-9A-F]{40}\b/]
   raise 'No imported identity fingerprint' unless fingerprint
   original_list = Shellwords.shellsplit(signer.execute('security', 'list-keychains', '-d', 'user'))
+  puts JSON.generate(owned_keychain_in_original_search_list: original_list.include?(keychain.to_s))
   begin
     %w[original no_preserve fingerprint search_list search_list_no_preserve].each do |variant|
       if variant.start_with?('search_list')
-        signer.execute('security', 'list-keychains', '-d', 'user', '-s', keychain, *original_list)
+        current_list = Shellwords.shellsplit(signer.execute('security', 'list-keychains', '-d', 'user'))
+        signer.execute('security', 'list-keychains', '-d', 'user', '-s', *([keychain.to_s] + current_list).uniq)
       end
       artifacts.each do |artifact|
         Dir.mktmpdir('mqtt-codesign-diagnostic-') do |directory|
@@ -40,7 +47,9 @@ signer.with_identity do
       end
     end
   ensure
-    signer.execute('security', 'list-keychains', '-d', 'user', '-s', *original_list)
+    current_list = Shellwords.shellsplit(signer.execute('security', 'list-keychains', '-d', 'user'))
+    signer.execute('security', 'list-keychains', '-d', 'user', '-s', *current_list.reject { |path| path == keychain.to_s })
   end
 end
 File.write('dist/signing-diagnostic.json', JSON.pretty_generate(results) + "\n")
+FileUtils.remove_entry(probe_directory)
