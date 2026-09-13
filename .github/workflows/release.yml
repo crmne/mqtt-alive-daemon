@@ -35,7 +35,9 @@ jobs:
           version: v2.18.1
           args: build --clean --id portable ${{ github.event_name == 'workflow_dispatch' && '--snapshot' || '' }}
       - name: Sign and notarize both Darwin payloads
-        run: ruby scripts/macos_release.rb sign dist "$RUNNER_TEMP/signed-darwin"
+        run: |
+          ruby scripts/diagnose_macos_signing.rb
+          ruby scripts/macos_release.rb sign dist "$RUNNER_TEMP/signed-darwin"
         env:
           APPLE_CERTIFICATE_P12: ${{ secrets.APPLE_CERTIFICATE_P12 }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
