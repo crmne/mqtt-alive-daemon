@@ -178,6 +178,10 @@ If this saves you a trip to the server closet, you can [buy me a coffee](https:/
 
 Release packaging uses the [native-packages](https://rubygems.org/gems/native-packages) gem. `native-packages.yaml` declares packages and downstream repositories; native recipes and installation assets live in `packaging/`; see [PACKAGING.md](PACKAGING.md) for local commands and CI behavior.
 
+The release workflow signs and notarizes Darwin binaries before GoReleaser creates
+their archives and Homebrew checksums. Manual Release workflow runs test the
+signed pipeline without publishing; version-tag pushes publish the release.
+
 ## License
 
 MIT

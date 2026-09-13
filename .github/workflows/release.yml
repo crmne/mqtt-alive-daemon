@@ -4,13 +4,54 @@ on:
   push:
     tags:
       - "v*"
+  # Manual runs exercise signed archives without publishing a release or tap update.
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
+  notarize-darwin:
+    runs-on: macos-15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '4.0'
+      - run: gem install native-packages --version 0.5.0 --no-document
+      - name: Test on native macOS
+        run: go test ./...
+      - name: Build Darwin inputs with the release configuration
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: v2.18.1
+          args: build --clean --id portable ${{ github.event_name == 'workflow_dispatch' && '--snapshot' || '' }}
+      - name: Sign and notarize both Darwin payloads
+        run: ruby scripts/macos_release.rb sign dist "$RUNNER_TEMP/signed-darwin"
+        env:
+          APPLE_CERTIFICATE_P12: ${{ secrets.APPLE_CERTIFICATE_P12 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: signed-darwin
+          path: ${{ runner.temp }}/signed-darwin/
+          if-no-files-found: error
+          retention-days: 3
+
   goreleaser:
+    needs: notarize-darwin
     # 22.04 keeps the glibc floor of the cgo linux binaries at 2.35
     runs-on: ubuntu-22.04
     steps:
@@ -29,18 +70,39 @@ jobs:
       - name: Run tests
         run: go test ./...
 
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '4.0'
+      - uses: actions/download-artifact@v4
+        with:
+          name: signed-darwin
+          path: ${{ runner.temp }}/signed-darwin
+
       - name: Goreleaser
         uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
-          version: "~> v2"
-          args: release --clean
+          version: v2.18.1
+          args: release --clean ${{ github.event_name == 'workflow_dispatch' && '--snapshot --skip=publish' || '' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+          MQTT_SIGNED_DARWIN: ${{ runner.temp }}/signed-darwin
+          MQTT_REQUIRE_SIGNED_DARWIN: '1'
+      - name: Retain final archives and checksums for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-archives
+          path: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/checksums.txt
+            dist/homebrew/**
+          if-no-files-found: error
+          retention-days: 3
 
   packaging:
-    if: startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-')
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-')
     needs: goreleaser
     uses: ./.github/workflows/packaging.yml
     with:

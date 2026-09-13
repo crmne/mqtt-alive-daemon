@@ -55,6 +55,39 @@ pin together. Applications need no packaging Gemfile, lockfile or Ruby wrapper.
 GoReleaser continues to build the native archives and publish the Homebrew
 formula with its service integration. Do not enable a second Homebrew publisher.
 
+## macOS signing and release order
+
+The Release workflow first builds the portable targets on macOS with pinned
+GoReleaser 2.18.1. `scripts/macos_release.rb sign` stages both Darwin architectures
+and their archive assets, then uses published native-packages 0.5.0
+`notarize-macos INPUT --output FRESH_DIRECTORY` to sign and notarize the copied
+payload. Both executables must pass
+`codesign --verify --strict -R=notarized --check-notarization` before upload.
+Bare executables rely on Apple's online ticket lookup; they cannot carry
+stapled tickets and are not assessed with `spctl`'s app policy.
+
+The Ubuntu 22.04 GoReleaser job waits for that result. Its portable build hook
+imports the signed Darwin bytes after checking version, source commit,
+architecture, file hashes and archive assets. A missing or mismatched signing
+artifact fails the release. Linux retains its cgo/glibc 2.35 build and Windows
+retains its existing cross-build. GoReleaser then creates all six archives,
+calculates `checksums.txt` and the Homebrew formula hashes, and publishes them.
+No binary is changed after archiving or checksum generation.
+
+The native signing step requires these repository secrets:
+`APPLE_CERTIFICATE_P12`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`,
+`APPLE_ID`, `APPLE_TEAM_ID` and `APPLE_APP_PASSWORD`. Their formats and the shared
+keychain lifecycle are documented in the
+[0.5.0 signing guide](https://github.com/crmne/native-packages/blob/v0.5.0/docs/apple-notarization.md).
+Secrets are exposed only to the Mac signing step.
+
+Pushing a version tag runs publication as before. A manual **Release** workflow
+run is now a snapshot acceptance test: it signs and builds archives but does
+not publish a GitHub release, update Homebrew or invoke downstream packaging.
+The final archives/checksums are retained as Actions artifacts for three days.
+Ordinary local GoReleaser builds without `MQTT_SIGNED_DARWIN` remain unsigned;
+CI sets `MQTT_REQUIRE_SIGNED_DARWIN=1` to disallow that fallback.
+
 ## Upstream Release Assets
 
 Releases are tagged `v<version>` (e.g. `v0.4.0`). Each tag publishes via
