@@ -1,8 +1,59 @@
-# Packaging mqtt-alive-daemon
+# Packaging
 
-This repository is the upstream source of truth for release artifacts and shared
-packaging assets. Distro-specific package recipes live in the package repository
-for that distro (e.g. the AUR git repos), not in this repository.
+[`native-packages.yaml`](native-packages.yaml) is the packaging configuration:
+it pins the shared CLI and nFPM versions and declares Linux amd64/arm64 inputs,
+DEB/RPM contents, dependencies, recipe templates and downstream repositories.
+Application assets and native recipes stay in `packaging/`.
+
+```sh
+gem install native-packages --version 0.2.0
+native-packages validate
+native-packages doctor
+native-packages build --release v1.2.3
+```
+
+Replace `v1.2.3` with an existing stable application release. Local use also
+requires nFPM 2.47.0, `bsdtar` and `readelf`; AUR generation needs `makepkg`
+or Docker. CI installs its tooling. To package local release archives, put
+every configured input and recipe asset under `dist/`, then run
+`native-packages build --version 1.2.3`. Outputs go to
+`dist/packages/1.2.3`; use `--output` for a fresh destination when rebuilding.
+
+Stable tags run the existing native build jobs first. After binaries and
+`checksums.txt` are published, the shared workflow verifies their hashes,
+builds the configured packages, and attaches them to the GitHub release.
+Configured recipes are attached as an archive. Package checksums are separate
+from the original binary checksums. PR validation never publishes.
+
+Review or publish an existing build with the same installed CLI:
+
+```sh
+native-packages publish --from dist/packages/1.2.3 --to github
+native-packages repositories
+native-packages status --offline
+```
+
+For applications with configured AUR or Homebrew destinations, stage the
+recipes with `native-packages stage TARGET dist/packages/1.2.3/recipes`,
+inspect `native-packages diff TARGET`, run native package validation, and
+publish with `native-packages publish TARGET`. These destinations use ignored
+managed Git clones, recorded in this application's YAML configuration.
+AUR automation needs `PUBLISH_AUR=true`, `AUR_SSH_KEY` and `AUR_KNOWN_HOSTS`;
+Homebrew automation needs `PUBLISH_HOMEBREW=true` and
+`HOMEBREW_TAP_GITHUB_TOKEN`. Enable only configured destinations.
+
+The existing macOS, Windows and Flatpak build/signing steps remain responsible
+for their native artifacts. Additional nFPM formats require suitable platform
+inputs and dependencies; adding a format does not port the application.
+See the [shared CLI documentation](https://github.com/crmne/native-packages/tree/v0.2.0)
+for commands and supported formats.
+
+To upgrade the tool, change `tool.version` in `native-packages.yaml`, the
+matching immutable workflow reference, and any release-job gem installation
+pin together. Applications need no packaging Gemfile, lockfile or Ruby wrapper.
+
+GoReleaser continues to build the native archives and publish the Homebrew
+formula with its service integration. Do not enable a second Homebrew publisher.
 
 ## Upstream Release Assets
 
@@ -16,6 +67,7 @@ goreleaser:
 - `mqtt-alive-daemon_<version>_windows_amd64.zip`
 - `mqtt-alive-daemon_<version>_windows_arm64.zip`
 - `checksums.txt`
+- Linux DEB/RPM files and `packaging-checksums.txt` after stable packaging succeeds
 - GitHub's automatic source archive for the tag
 
 The linux binaries are built with cgo so `.local` (mDNS) broker names resolve
@@ -82,27 +134,21 @@ systemctl enable --now mqtt-alive-daemon
 
 ## AUR
 
-The AUR packages are maintained in separate git repos, checked out locally under
-`.tmp/` (gitignored):
-
-- `.tmp/aur-mqtt-alive-daemon`: stable, builds from the release tag
-  (`ssh://aur@aur.archlinux.org/mqtt-alive-daemon.git`)
-- `.tmp/aur-mqtt-alive-daemon-git`: builds from the latest git commit
-  (`ssh://aur@aur.archlinux.org/mqtt-alive-daemon-git.git`)
-
-Release flow for the stable package:
+The stable and Git recipes live in `packaging/arch/`. Their independent AUR Git
+repositories are registered in `native-packages.yaml`; the shared CLI
+creates managed checkouts under `.cache/packaging/repos/`.
 
 ```sh
-cd .tmp/aur-mqtt-alive-daemon
-# bump pkgver (and reset pkgrel=1) in PKGBUILD, then:
-updpkgsums
-makepkg --printsrcinfo > .SRCINFO
-makepkg -f   # smoke test
-git commit -am "Update to <version>"
-git push origin master
+native-packages build --release v0.4.1
+native-packages stage aur dist/packages/0.4.1/recipes
+native-packages diff aur
+# Validate the native package builds before publishing.
+native-packages publish aur
 ```
 
-The `-git` package only needs a push when the PKGBUILD itself changes.
+Automatic stable-release publication requires `PUBLISH_AUR=true`, `AUR_SSH_KEY`
+and `AUR_KNOWN_HOSTS`. The existing `.tmp/` clones remain historical workspaces;
+new recipe edits belong here. A Git recipe change does not require an app release.
 
 ## Homebrew
 

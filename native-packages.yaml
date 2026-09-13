@@ -1,0 +1,115 @@
+# Shared CLI: gem install native-packages --version 0.2.0
+---
+schema: 1
+tool:
+  version: 0.2.0
+  nfpm: 2.47.0
+nfpm:
+  name: mqtt-alive-daemon
+  maintainer: Carmine Paolino <carmine@paolino.me>
+  homepage: https://github.com/crmne/mqtt-alive-daemon
+  description: Reports machine aliveness and checks to Home Assistant via MQTT
+  license: MIT
+  contents:
+  - src: "@PAYLOAD@/mqtt-alive-daemon"
+    dst: "/usr/bin/mqtt-alive-daemon"
+    file_info:
+      mode: 493
+  - src: "@PAYLOAD@/LICENSE"
+    dst: "/usr/share/licenses/mqtt-alive-daemon/LICENSE"
+    file_info:
+      mode: 420
+  - src: "@PAYLOAD@/README.md"
+    dst: "/usr/share/doc/mqtt-alive-daemon/README.md"
+    file_info:
+      mode: 420
+  - src: "@PAYLOAD@/packaging/systemd/mqtt-alive-daemon.service"
+    dst: "/usr/lib/systemd/system/mqtt-alive-daemon.service"
+    file_info:
+      mode: 420
+  - src: "@PAYLOAD@/config.yaml.example"
+    dst: "/etc/mqtt-alive-daemon/config.yaml.example"
+    file_info:
+      mode: 420
+  overrides:
+    deb:
+      depends:
+      - libc6 (>= 2.34)
+      - bash
+    rpm:
+      depends:
+      - glibc >= 2.34
+      - bash
+  rpm:
+    buildhost: github-actions
+targets:
+  linux-amd64:
+    platform: linux
+    arch: amd64
+    libc: glibc
+    compiler_target: x86_64-unknown-linux-gnu
+    formats:
+    - deb
+    - rpm
+    input:
+      local: dist/mqtt-alive-daemon_@VERSION@_linux_amd64.tar.gz
+      release_asset: mqtt-alive-daemon_@VERSION@_linux_amd64.tar.gz
+  linux-arm64:
+    platform: linux
+    arch: arm64
+    libc: glibc
+    compiler_target: aarch64-unknown-linux-gnu
+    formats:
+    - deb
+    - rpm
+    input:
+      local: dist/mqtt-alive-daemon_@VERSION@_linux_arm64.tar.gz
+      release_asset: mqtt-alive-daemon_@VERSION@_linux_arm64.tar.gz
+release:
+  repository: crmne/mqtt-alive-daemon
+  checksums: checksums.txt
+assets:
+  AMD64:
+    file: mqtt-alive-daemon_@VERSION@_linux_amd64.tar.gz
+    local: dist/mqtt-alive-daemon_@VERSION@_linux_amd64.tar.gz
+  ARM64:
+    file: mqtt-alive-daemon_@VERSION@_linux_arm64.tar.gz
+    local: dist/mqtt-alive-daemon_@VERSION@_linux_arm64.tar.gz
+  SOURCE:
+    file: mqtt-alive-daemon-@VERSION@.tar.gz
+    url: https://github.com/crmne/mqtt-alive-daemon/archive/refs/tags/v@VERSION@.tar.gz
+    checksummed: false
+    local: dist/mqtt-alive-daemon-@VERSION@.tar.gz
+templates:
+  arch/mqtt-alive-daemon/PKGBUILD: packaging/arch/mqtt-alive-daemon/PKGBUILD.in
+  arch/mqtt-alive-daemon/mqtt-alive-daemon.install: packaging/arch/mqtt-alive-daemon.install
+  arch/mqtt-alive-daemon-git/PKGBUILD: packaging/arch/mqtt-alive-daemon-git/PKGBUILD.in
+  arch/mqtt-alive-daemon-git/mqtt-alive-daemon-git.install: packaging/arch/mqtt-alive-daemon.install
+repositories:
+  homebrew:
+    url: https://github.com/crmne/homebrew-tap
+    publish: manual
+    notes: Published automatically by the existing GoReleaser Homebrew integration;
+      its formula definition stays in .goreleaser.yml.
+  aur-source:
+    group: aur
+    url: https://aur.archlinux.org/mqtt-alive-daemon.git
+    push_url: ssh://aur@aur.archlinux.org/mqtt-alive-daemon.git
+    branch: master
+    package_path: "."
+    files:
+      arch/mqtt-alive-daemon: "."
+    version_file: ".SRCINFO"
+    version_pattern: "^\\s*pkgver = (\\S+)"
+    publish: push
+  aur-git:
+    group: aur
+    url: https://aur.archlinux.org/mqtt-alive-daemon-git.git
+    push_url: ssh://aur@aur.archlinux.org/mqtt-alive-daemon-git.git
+    branch: master
+    package_path: "."
+    files:
+      arch/mqtt-alive-daemon-git: "."
+    version_file: ".SRCINFO"
+    version_pattern: "^\\s*pkgver = (\\S+)"
+    publish: push

@@ -31,3 +31,7 @@ dist/
 
 # Packaging workspace (AUR checkouts, scratch builds)
 .tmp/
+
+/.cache/
+
+/dist/

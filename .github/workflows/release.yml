@@ -38,3 +38,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+
+  packaging:
+    if: startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-')
+    needs: goreleaser
+    uses: ./.github/workflows/packaging.yml
+    with:
+      version: ${{ github.ref_name }}
+    secrets: inherit
