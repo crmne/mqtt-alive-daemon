@@ -23,7 +23,7 @@ class MacosReleaseTest < Minitest::Test
       end
     end
     @manifest = {
-      'schema' => 1, 'tool' => 'native-packages 0.5.0', 'version' => '1.2.3', 'commit' => 'abc123',
+      'schema' => 1, 'tool' => 'native-packages 0.5.1', 'version' => '1.2.3', 'commit' => 'abc123',
       'files' => MacosRelease.payload_files.to_h { |p| [p, Digest::SHA256.file(File.join(@signed, p)).hexdigest] }
     }
     save_manifest

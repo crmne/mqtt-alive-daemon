@@ -59,7 +59,7 @@ module MacosRelease
         end
       end
       FileUtils.mkdir_p(File.dirname(File.expand_path(output)))
-      run(Gem.ruby, '-e', 'gem "native-packages", "0.5.0"; load Gem.bin_path("native-packages", "native-packages", "0.5.0")',
+      run(Gem.ruby, '-e', 'gem "native-packages", "0.5.1"; load Gem.bin_path("native-packages", "native-packages", "0.5.1")',
         'notarize-macos', input, '--output', output)
     end
     ARCHITECTURES.each_key do |arch|
@@ -68,7 +68,7 @@ module MacosRelease
       run('codesign', '--verify', '--strict', '-R=notarized', '--check-notarization', binary)
     end
     manifest = {
-      'schema' => 1, 'tool' => 'native-packages 0.5.0',
+      'schema' => 1, 'tool' => 'native-packages 0.5.1',
       'version' => metadata.fetch('version'), 'commit' => metadata.fetch('commit'),
       'files' => payload_files.to_h { |path| [path, Digest::SHA256.file(File.join(output, path)).hexdigest] }
     }
@@ -86,7 +86,7 @@ module MacosRelease
     end
     raise "Unsupported Darwin architecture: #{arch}" unless ARCHITECTURES.key?(arch)
     manifest = JSON.parse(File.read(File.join(signed, 'manifest.json')))
-    raise 'Unsupported signing manifest' unless manifest.fetch('schema') == 1 && manifest.fetch('tool') == 'native-packages 0.5.0'
+    raise 'Unsupported signing manifest' unless manifest.fetch('schema') == 1 && manifest.fetch('tool') == 'native-packages 0.5.1'
     raise 'Signed payload version/commit does not match this build' unless manifest.fetch('version') == version && manifest.fetch('commit') == commit
     files = manifest.fetch('files')
     raise 'Incomplete signed payload manifest' unless files.keys.sort == payload_files.sort

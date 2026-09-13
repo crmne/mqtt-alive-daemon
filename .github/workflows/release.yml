@@ -25,7 +25,18 @@ jobs:
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: '4.0'
-      - run: gem install native-packages --version 0.5.0 --no-document
+      - uses: actions/checkout@v4
+        with:
+          repository: crmne/native-packages
+          ref: 5caecbb702d6605cb48f83c380ea8b8196c9909e
+          path: .cache/native-packages-candidate
+          persist-credentials: false
+      - name: Install the exact candidate gem for this QA run
+        run: |
+          test "$(git -C .cache/native-packages-candidate rev-parse HEAD)" = 5caecbb702d6605cb48f83c380ea8b8196c9909e
+          cd .cache/native-packages-candidate
+          gem build native-packages.gemspec
+          gem install --local native-packages-0.5.1.gem --no-document
       - name: Test on native macOS
         run: go test ./...
       - name: Build Darwin inputs with the release configuration
@@ -35,7 +46,25 @@ jobs:
           version: v2.18.1
           args: build --clean --id portable ${{ github.event_name == 'workflow_dispatch' && '--snapshot' || '' }}
       - name: Sign and notarize both Darwin payloads
-        run: ruby scripts/macos_release.rb sign dist "$RUNNER_TEMP/signed-darwin"
+        run: |
+          ruby <<'RUBY_QA'
+          require 'json'
+          require 'open3'
+          require 'shellwords'
+          def state
+            capture = ->(*args) { out, status = Open3.capture2('security', *args); raise 'Cannot read keychain state' unless status.success?; Shellwords.shellsplit(out) }
+            { 'search_list' => capture.call('list-keychains', '-d', 'user'), 'default' => capture.call('default-keychain', '-d', 'user') }
+          end
+          before = state
+          begin
+            raise 'Candidate signing failed' unless system('ruby', 'scripts/macos_release.rb', 'sign', 'dist', File.join(ENV.fetch('RUNNER_TEMP'), 'signed-darwin'))
+          ensure
+            after = state
+            result = { 'candidate' => '5caecbb702d6605cb48f83c380ea8b8196c9909e', 'search_list_unchanged' => before.fetch('search_list') == after.fetch('search_list'), 'default_unchanged' => before.fetch('default') == after.fetch('default') }
+            puts JSON.generate(result)
+            raise 'Candidate changed existing keychain state' unless result.fetch('search_list_unchanged') && result.fetch('default_unchanged')
+          end
+          RUBY_QA
         env:
           APPLE_CERTIFICATE_P12: ${{ secrets.APPLE_CERTIFICATE_P12 }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
