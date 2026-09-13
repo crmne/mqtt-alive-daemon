@@ -26,6 +26,14 @@ jobs:
       - name: Test
         run: go test ./...
 
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '4.0'
+      - name: Test signed release artifact handoff
+        run: |
+          gem install minitest --version 6.0.6 --no-document
+          ruby scripts/macos_release_test.rb
+
       - name: Vet
         run: go vet ./...
 

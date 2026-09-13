@@ -41,6 +41,9 @@ builds:
       - arm64
     ldflags:
       - -s -w -X github.com/crmne/mqtt-alive-daemon/pkg/mqttalive.Version={{ .Version }}
+    # Import the Mac job's signed bytes before archiving, checksums and Homebrew.
+    hooks:
+      post: ruby scripts/macos_release.rb import "{{ .Os }}" "{{ .Arch }}" "{{ .Path }}" "{{ .Version }}" "{{ .FullCommit }}"
 
 archives:
   - id: bundle
