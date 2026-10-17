@@ -6,7 +6,7 @@ DEB/RPM contents, dependencies, recipe templates and downstream repositories.
 Application assets and native recipes stay in `packaging/`.
 
 ```sh
-gem install native-packages --version 0.5.1
+gem install native-packages --version 0.10.0
 native-packages validate
 native-packages doctor
 native-packages build --release v1.2.3
@@ -45,7 +45,7 @@ Homebrew automation needs `PUBLISH_HOMEBREW=true` and
 The existing macOS, Windows and Flatpak build/signing steps remain responsible
 for their native artifacts. Additional nFPM formats require suitable platform
 inputs and dependencies; adding a format does not port the application.
-See the [shared CLI documentation](https://github.com/crmne/native-packages/tree/v0.5.1)
+See the [shared CLI documentation](https://github.com/crmne/native-packages/tree/v0.10.0)
 for commands and supported formats.
 
 To upgrade the tool, change `tool.version` in `native-packages.yaml`, the
@@ -59,7 +59,7 @@ formula with its service integration. Do not enable a second Homebrew publisher.
 
 The Release workflow first builds the portable targets on macOS with pinned
 GoReleaser 2.18.1. `scripts/macos_release.rb sign` stages both Darwin architectures
-and their archive assets, then uses published native-packages 0.5.1
+and their archive assets, then uses published native-packages 0.10.0
 `notarize-macos INPUT --output FRESH_DIRECTORY` to sign and notarize the copied
 payload. Both executables must pass
 `codesign --verify --strict -R=notarized --check-notarization` before upload.
@@ -78,7 +78,7 @@ The native signing step requires these repository secrets:
 `APPLE_CERTIFICATE_P12`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`,
 `APPLE_ID`, `APPLE_TEAM_ID` and `APPLE_APP_PASSWORD`. Their formats and the shared
 keychain lifecycle are documented in the
-[0.5.1 signing guide](https://github.com/crmne/native-packages/blob/v0.5.1/docs/apple-notarization.md).
+[0.10.0 signing guide](https://github.com/crmne/native-packages/blob/v0.10.0/docs/apple-notarization.md).
 Secrets are exposed only to the Mac signing step.
 
 Pushing a version tag runs publication as before. A manual **Release** workflow
