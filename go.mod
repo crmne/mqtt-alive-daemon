@@ -1,6 +1,6 @@
 module github.com/crmne/mqtt-alive-daemon
 
-go 1.26.0
+go 1.26.10
 
 require (
 	github.com/denisbrodbeck/machineid v1.0.1
