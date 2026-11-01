@@ -81,7 +81,9 @@ keychain lifecycle are documented in the
 [0.10.0 signing guide](https://github.com/crmne/native-packages/blob/v0.10.0/docs/apple-notarization.md).
 Secrets are exposed only to the Mac signing step.
 
-Pushing a version tag runs publication as before. A manual **Release** workflow
+Pushing a version tag runs publication as before, using the hand-written notes
+committed at `packaging/release-notes/<tag>.md`. A tag without that file stops
+the workflow before anything is built or published. A manual **Release** workflow
 run is now a snapshot acceptance test: it signs and builds archives but does
 not publish a GitHub release, update Homebrew or invoke downstream packaging.
 The final archives/checksums are retained as Actions artifacts for three days.
