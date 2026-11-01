@@ -16,7 +16,7 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-var Version = "0.4.1"
+var Version = "0.4.2"
 
 type Config struct {
 	MQTTBroker   string                   `yaml:"mqtt_broker"`
