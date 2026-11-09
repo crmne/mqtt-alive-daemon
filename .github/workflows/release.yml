@@ -35,7 +35,7 @@ jobs:
         uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
-          version: v2.19.0
+          version: v2.20.0
           args: build --clean --id portable ${{ github.event_name == 'workflow_dispatch' && '--snapshot' || '' }}
       - name: Sign and notarize both Darwin payloads
         run: ruby scripts/macos_release.rb sign dist "$RUNNER_TEMP/signed-darwin"
@@ -85,7 +85,7 @@ jobs:
         uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
-          version: v2.19.0
+          version: v2.20.0
           args: release --clean ${{ github.event_name == 'workflow_dispatch' && '--snapshot --skip=publish' || format('--release-notes packaging/release-notes/{0}.md', github.ref_name) }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
