@@ -46,7 +46,7 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: signed-darwin
           path: ${{ runner.temp }}/signed-darwin/
@@ -76,7 +76,7 @@ jobs:
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: '4.0'
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: signed-darwin
           path: ${{ runner.temp }}/signed-darwin
@@ -93,7 +93,7 @@ jobs:
           MQTT_SIGNED_DARWIN: ${{ runner.temp }}/signed-darwin
           MQTT_REQUIRE_SIGNED_DARWIN: '1'
       - name: Retain final archives and checksums for review
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-archives
           path: |
