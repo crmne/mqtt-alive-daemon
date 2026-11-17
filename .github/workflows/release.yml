@@ -22,7 +22,7 @@ jobs:
       - name: Require committed release notes
         if: github.event_name == 'push'
         run: test -s "packaging/release-notes/$GITHUB_REF_NAME.md"
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
       - uses: ruby/setup-ruby@v1
@@ -62,7 +62,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache: true
