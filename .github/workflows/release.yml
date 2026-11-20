@@ -56,7 +56,7 @@ jobs:
   goreleaser:
     needs: notarize-darwin
     # 22.04 keeps the glibc floor of the cgo linux binaries at 2.35
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v4
         with:
